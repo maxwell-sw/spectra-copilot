@@ -60,7 +60,7 @@ Spectra Copilot 不把“哪种材料更好”简化成一次点击。它会根�
 | 光谱特征分析 | `summarize_band_features` | 计算指定波段的均值、极值、极值位置和趋势 |
 | 物理加权计算 | `calculate_weighted_metrics` | 对 nm 数据使用 ASTM G173 AM1.5G，对 μm/波数数据按指定温度进行 Planck 黑体加权与梯形积分 |
 | 科学可视化 | `generate_spectrum_chart`、`generate_comparison_chart` | 基于原始点生成单样品或多样品真实谱图与波段标注 |
-| 报告与网页交付 | `generate_analysis_report`、`generate_custom_html_deliverable` | 生成带真实谱图和工具事实的 HTML 报告或自定义网页交付物 |
+| 报告与网页交付 | `generate_screening_report`、`generate_analysis_report`、`generate_custom_html_deliverable` | 生成多材料筛选报告、单样品报告或自定义 HTML 交付物；报告均含真实谱图和工具事实 |
 | 可追溯修改 | `read_current_artifact`、`patch_current_html_artifact` | 使用 `@交付物` 锁定已有成果，只创建该成果的下一版本，避免误改其他文件 |
 | 数据导出 | `/api/weighted-export` | 将已得到的加权结果导出为 CSV 或 Excel |
 
@@ -99,6 +99,8 @@ npm start
 **在线体验：<https://spectra-copilot.onrender.com/>**
 
 仓库可以以公共上传模式部署为 HTTPS 网页。访问者打开链接后上传自己的光谱文件，再在浏览器中填入自己的 DeepSeek 或兼容模型 Key，即可使用同一套 Agent、工具调用、图表和报告能力。
+
+页面首页还提供“60 秒面试演示”：一键载入 5 份公开样例，并填入可直接运行的红外隐身材料初筛任务。它固定声明数据含义、3–5 / 8–14 μm 波段、300 K 和不透明假设，便于展示 Agent 的工具调用、可审计计算、对比图和多材料筛选报告；该结论只适用于演示数据与这些前提。
 
 - 本地开发默认仍是 Desktop 模式；公共部署必须设置 `SPECTRA_MODE=public`。
 - 在线版**不扫描访问者电脑**，只读取用户主动上传的 CSV、TXT、TSV、DPT、XLSX 文件。

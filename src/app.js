@@ -32,6 +32,9 @@ const workspaceSplitter = document.querySelector("#workspace-splitter");
 const imageTray = document.querySelector("#image-tray");
 const fileTray = document.querySelector("#file-tray");
 const sendButton = document.querySelector("#send-button");
+const loadDemoButton = document.querySelector("#load-demo");
+const fillDemoTaskButton = document.querySelector("#fill-demo-task");
+const runDemoButton = document.querySelector("#run-demo");
 
 const sessionKey = "spectra-copilot-session-v2";
 const historyKey = "spectra-copilot-history-v1";
@@ -53,6 +56,16 @@ let pendingImages = [];
 let stagedSpectrumFiles = [];
 let pendingTaskAfterConfirmation = "";
 sessionStorage.setItem("spectra-copilot-current-session", currentSessionId);
+
+const demoSamples = [
+  { source: "/demo-data/demo-50.csv", name: "演示样品-50.csv" },
+  { source: "/demo-data/demo-150.csv", name: "演示样品-150.csv" },
+  { source: "/demo-data/demo-250.csv", name: "演示样品-250.csv" },
+  { source: "/demo-data/demo-350.csv", name: "演示样品-350.csv" },
+  { source: "/demo-data/demo-450.csv", name: "演示样品-450.csv" },
+];
+const demoSampleNames = new Set(demoSamples.map((sample) => sample.name));
+const recommendedDemoTask = "请以这 5 份演示样品为候选材料，完成一次可审计的红外隐身材料初筛。已确认：横轴为 μm，Y 列为反射率 R（%），样品近似不透明（T≈0）；因此仅在本批数据与该假设下，可用 ε≈1−R 作为相对热辐射表征。请在 3–5 μm 与 8–14 μm 波段、300 K 黑体权重下调用受控工具，计算每个样品的 Weighted 反射率并排序，给出最优候选；生成一张 5 条曲线的对比谱图和一份面试展示型 HTML 筛选报告。结论请明确区分工具事实、在此假设下的工程判断，以及仍需补测或验证的条件。";
 
 function isPublicWeb() { return appConfig.mode === "public-web"; }
 
@@ -164,7 +177,7 @@ function uploadFileWithProgress(entry) {
   });
 }
 
-async function stageAndUploadFiles(files) {
+async function stageAndUploadFiles(files, { inferUnits = true } = {}) {
   const entries = [...files].map((file) => ({ id: crypto.randomUUID(), file, status: "queued", progress: 0, inspections: [], error: "", xhr: null, cancelled: false }));
   if (!entries.length) return;
   stagedSpectrumFiles.push(...entries);
@@ -183,7 +196,7 @@ async function stageAndUploadFiles(files) {
   if (!analyzable.length) return renderFileTray();
   analyzable.forEach((entry) => { entry.status = "inferring"; entry.progress = 90; });
   renderFileTray();
-  const inferred = await applyAiUnitInference(analyzable.flatMap((entry) => entry.inspections));
+  const inferred = inferUnits ? await applyAiUnitInference(analyzable.flatMap((entry) => entry.inspections)) : analyzable.flatMap((entry) => entry.inspections);
   const byPath = new Map(inferred.map((inspection) => [inspection.file.path, inspection]));
   analyzable.forEach((entry) => {
     if (entry.cancelled) return;
@@ -192,6 +205,58 @@ async function stageAndUploadFiles(files) {
     entry.progress = 100;
   });
   renderFileTray();
+}
+
+function demoConfirmation(path) {
+  return { path, unit: "um", valueType: "reflectance", valueUnit: "percent", opaque: true };
+}
+
+function hasLoadedDemoSamples() {
+  return [...selectedFiles.values()].filter((item) => demoSampleNames.has(item.file.name)).length === demoSamples.length;
+}
+
+function hasNonDemoSamples() {
+  return [...selectedFiles.values()].some((item) => !demoSampleNames.has(item.file.name));
+}
+
+function fillRecommendedDemoTask() {
+  chatInput.value = recommendedDemoTask;
+  chatInput.focus();
+}
+
+async function loadDemoSamples() {
+  if (hasNonDemoSamples()) throw new Error("当前任务已经包含你的文件。为避免把演示数据与真实数据混在一起，请先点击右上角“新任务”再载入演示。" );
+  if (hasLoadedDemoSamples()) {
+    fillRecommendedDemoTask();
+    return;
+  }
+  loadDemoButton.disabled = true;
+  loadDemoButton.textContent = "正在载入…";
+  try {
+    const files = await Promise.all(demoSamples.map(async (sample) => {
+      const response = await fetch(sample.source);
+      if (!response.ok) throw new Error(`无法读取演示文件 ${sample.name}。`);
+      return new File([await response.blob()], sample.name, { type: "text/csv" });
+    }));
+    await stageAndUploadFiles(files, { inferUnits: false });
+    const entries = stagedSpectrumFiles.filter((entry) => demoSampleNames.has(entry.file.name));
+    const readyEntries = entries.filter((entry) => entry.status === "ready");
+    stagedSpectrumFiles = stagedSpectrumFiles.filter((entry) => !demoSampleNames.has(entry.file.name));
+    renderFileTray();
+    if (readyEntries.length !== demoSamples.length) throw new Error("部分演示文件没有成功解析，请刷新后重试。" );
+    addInspections(readyEntries.flatMap((entry) => entry.inspections), { announce: false, showConfirmation: false });
+    readyEntries.flatMap((entry) => entry.inspections).forEach((item) => updateFile(item.file.path, { confirmation: demoConfirmation(item.file.path) }));
+    requirements.bandText = "3-5；8-14";
+    requirements.temperatureKelvin = "300";
+    requirements.temperatureText = "300";
+    saveSession();
+    renderStatus();
+    fillRecommendedDemoTask();
+    addMessage("assistant", "<p><b>演示数据已就绪：</b>5 份样例已作为同一批候选材料载入，并使用已公开的演示前提完成确认。推荐任务已填入输入框；点击“运行 Agent”即可展示任务理解、受控工具调用、加权比较、对比图与筛选报告。</p><p class=\"muted\">演示结论只适用于这批数据、3–5 / 8–14 μm、300 K 及不透明假设；它不会替代真实材料的角分辨、温度依赖或发射率实测验证。</p>");
+  } finally {
+    loadDemoButton.disabled = false;
+    loadDemoButton.textContent = "1. 载入演示数据";
+  }
 }
 
 function mentionItems() {
@@ -1044,6 +1109,25 @@ chatInput.addEventListener("blur", () => setTimeout(closeMentionMenu, 120));
 fileUpload.addEventListener("change", () => {
   stageAndUploadFiles([...fileUpload.files]).catch(showError);
   fileUpload.value = "";
+});
+loadDemoButton.addEventListener("click", () => loadDemoSamples().catch(showError));
+fillDemoTaskButton.addEventListener("click", () => {
+  if (!hasLoadedDemoSamples()) addMessage("assistant", "<p>请先点击“1. 载入演示数据”。</p>");
+  else fillRecommendedDemoTask();
+});
+runDemoButton.addEventListener("click", async () => {
+  try {
+    if (!hasLoadedDemoSamples()) await loadDemoSamples();
+    if (!aiSession.apiKey) {
+      apiKeyInput.value = "";
+      renderApiSettings();
+      if (!apiDialog.open) apiDialog.showModal();
+      addMessage("assistant", "<p>演示数据已经准备好。填入自己的模型 Key 后，点击“3. 运行 Agent”即可开始；Key 只用于当前浏览器会话。</p>");
+      return;
+    }
+    fillRecommendedDemoTask();
+    await submitChatMessage(recommendedDemoTask);
+  } catch (error) { showError(error); }
 });
 
 apiSettingsButton.addEventListener("click", () => {

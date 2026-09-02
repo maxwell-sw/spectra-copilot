@@ -14,6 +14,11 @@
         <div class="header-actions"><button id="toggle-preview" class="secondary" type="button">交付物预览</button><button id="history-button" class="secondary" type="button">历史</button><button id="api-settings" class="secondary" type="button">AI 设置</button><button id="clear-session" class="text-button" type="button">新任务</button></div>
       </header>
 
+      <section class="demo-card" aria-labelledby="demo-title">
+        <div class="demo-copy"><p class="step">INTERVIEW DEMO · 60 SECONDS</p><h2 id="demo-title">一键体验：红外隐身材料初筛</h2><p>载入 5 份间隔样例（50 / 150 / 250 / 350 / 450），以受控工具完成 3–5 μm、8–14 μm 的 300 K 加权比较，生成对比谱图与筛选报告。</p><p class="demo-assumption">演示预设：横轴为 μm、Y 值为反射率 R（%）、样品近似不透明（T≈0）。结论仅适用于该数据与假设，并会在报告中标出验证边界。</p></div>
+        <div class="demo-actions"><button id="load-demo" class="primary" type="button">1. 载入演示数据</button><button id="fill-demo-task" class="secondary" type="button">2. 填入推荐任务</button><button id="run-demo" class="secondary" type="button">3. 运行 Agent</button></div>
+      </section>
+
       <div class="workbench">
         <section class="card chat-card" aria-label="光谱分析对话">
           <div id="messages" class="messages" aria-live="polite"></div>

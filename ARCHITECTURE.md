@@ -138,7 +138,7 @@ flowchart LR
 | 确定性分析 | `summarize_band_features` | 计算波段均值、极值、位置与趋势 |
 | 物理计算 | `calculate_weighted_metrics` | ASTM/黑体加权与梯形积分 |
 | 可视化 | `generate_spectrum_chart`、`generate_comparison_chart` | 生成真实单/多曲线图 |
-| 报告/网页 | `generate_analysis_report`、`generate_custom_html_deliverable` | 生成固定或自由版式 HTML；报告强制含真实谱图 |
+| 报告/网页 | `generate_screening_report`、`generate_analysis_report`、`generate_custom_html_deliverable` | 生成多材料筛选、单样品或自由版式 HTML；报告强制含真实谱图 |
 | 导出 | `/api/weighted-export` | 用户点击后导出 CSV/Excel，不进入预览物版本树 |
 
 下一批优先工具应是：光谱重采样与清洗预览（需用户确认后才落盘）、A/T/R 能量守恒检查、多文件批量排序、可重复的图表主题配置、结果不确定度和重复实验统计。文献检索属于外部证据工具，必须单独接入来源与引用系统，不能由当前模型凭记忆替代。

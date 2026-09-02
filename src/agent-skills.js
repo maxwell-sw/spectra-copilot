@@ -10,7 +10,7 @@ const intentCatalog = [
   { id: "weighted_physics", pattern: /(weighted|加权|积分|太阳|黑体|am1\.5|astm|普朗克|温度)/i, route: "检查波段和辐射源条件，再做确定性加权", tools: ["calculate_weighted_metrics", "get_legacy_demo_contract"] },
   { id: "comparison_screening", pattern: /(比较|对比|同图|叠加|排序|筛选|最佳|最好|优于|差异)/i, route: "先建立公共波段与可比条件，再计算特征或画同图", tools: ["get_selected_spectrum_summaries", "summarize_band_features", "calculate_weighted_metrics", "generate_comparison_chart"] },
   { id: "chart_creation", pattern: /(画图|绘图|出图|画.*图|谱图|曲线|可视化|图片|图形)/i, route: "仅在用户明确要图时生成；单样品与多样品分流", tools: ["generate_spectrum_chart", "generate_comparison_chart"] },
-  { id: "report_creation", pattern: /(报告|论文|摘要|结论|汇报|答辩|科研记录)/i, route: "先取得工具事实，再生成必须含真实谱图的报告", tools: ["summarize_band_features", "calculate_weighted_metrics", "generate_analysis_report", "generate_custom_html_deliverable"] },
+  { id: "report_creation", pattern: /(报告|论文|摘要|结论|汇报|答辩|科研记录)/i, route: "先取得工具事实，再生成必须含真实谱图的报告", tools: ["summarize_band_features", "calculate_weighted_metrics", "generate_screening_report", "generate_analysis_report", "generate_custom_html_deliverable"] },
   { id: "artifact_revision", pattern: /(@|修改|改成|调整|美化|换色|标题|坐标轴|图例|版式)/i, route: "锁定被引用交付物，只追加同一交付物的新版本", tools: ["generate_spectrum_chart", "generate_comparison_chart", "generate_analysis_report", "generate_custom_html_deliverable"] },
   { id: "data_export", pattern: /(导出|下载|csv|excel|xlsx)/i, route: "已有计算结果直接显示导出按钮，不创建预览物", tools: ["calculate_weighted_metrics"] },
   { id: "experiment_design", pattern: /(实验设计|下一步实验|测量方案|参数优化|材料设计|选材|制备建议)/i, route: "区分数据支持的结论与研究建议；不给虚构数值", tools: ["get_selected_spectrum_summaries", "summarize_band_features", "calculate_weighted_metrics"] },
@@ -66,7 +66,7 @@ export function selectAgentSkills({ task = "", activeArtifact = null, files = []
   if (intents.some((intent) => intent.id === "report_creation")) {
     skills.push({
       id: "scientific-reporting",
-      instruction: "报告必须包含：数据与确认条件、由本机原始数据绘制的真实谱图、计算方法、结果、AI 解释、限制与假设。固定模板用 generate_analysis_report；自由版式用 document_type=report 的 custom HTML 工具。",
+      instruction: "报告必须包含：数据与确认条件、由本机原始数据绘制的真实谱图、计算方法、结果、AI 解释、限制与假设。多材料筛选必须先算 Weighted，再用 generate_screening_report；单样品固定模板用 generate_analysis_report；自由版式用 document_type=report 的 custom HTML 工具。",
     });
   }
   if (activeArtifact?.isRevisionTarget) {
