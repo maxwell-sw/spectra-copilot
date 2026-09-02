@@ -3,14 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Spectra Copilot 本地光谱分析 Agent" />
+    <meta name="description" content="Spectra Copilot：面向材料、光学与热管理研究的光谱分析 Agent" />
     <title>Spectra Copilot</title>
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
     <main class="shell">
       <header class="app-header">
-        <div><p class="eyebrow">LOCAL · TOOL-USING · AGENT</p><h1>Spectra Copilot</h1><p id="task-status" class="intro">把数据和研究任务直接告诉 Agent。</p></div>
+        <div><p id="deployment-badge" class="eyebrow">LOCAL · TOOL-USING · AGENT</p><h1>Spectra Copilot</h1><p id="task-status" class="intro">把数据和研究任务直接告诉 Agent。</p></div>
         <div class="header-actions"><button id="toggle-preview" class="secondary" type="button">交付物预览</button><button id="history-button" class="secondary" type="button">历史</button><button id="api-settings" class="secondary" type="button">AI 设置</button><button id="clear-session" class="text-button" type="button">新任务</button></div>
       </header>
 
@@ -31,7 +31,7 @@
         <section class="card">
           <p class="step">模型设置 · 当前浏览器会话</p>
           <h2 id="api-title">连接你的模型 API Key</h2>
-          <p class="muted">刷新页面后仍会保留；关闭此浏览器标签页或点击“新任务”后自动清除。Key 不写入文件或服务日志。</p>
+          <p id="api-key-privacy" class="muted">Key 只保存在当前浏览器、当前设备的本地存储中；不会写入项目文件或服务日志。</p>
           <div class="settings api-settings-grid">
             <label>服务商
               <select id="ai-provider"><option value="deepseek">DeepSeek</option><option value="compatible">其他 OpenAI 兼容服务（仅本地测试）</option></select>

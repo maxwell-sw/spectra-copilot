@@ -13,10 +13,13 @@ import { mandatoryCalculationQuestion } from "./src/agent-guards.js";
 import { applyArtifactReplacements, readableArtifactHtml, taskExplicitlyEditsText, visibleArtifactText } from "./src/artifact-editor.js";
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+const publicWebMode = process.env.SPECTRA_MODE === "public";
 const desktopRoot = path.resolve(process.env.SPECTRA_DESKTOP_ROOT ?? path.join(homedir(), "Desktop"));
 const port = Number(process.env.PORT ?? 8787);
+const host = process.env.HOST ?? (publicWebMode ? "0.0.0.0" : "127.0.0.1");
 const allowedExtensions = new Set([".csv", ".txt", ".tsv", ".dpt", ".xlsx"]);
 const maxFileBytes = 20 * 1024 * 1024;
+const temporaryDataTtlMs = 2 * 60 * 60 * 1000;
 const uploadedFiles = new Map();
 const generatedArtifacts = new Map();
 const artifactDirectory = path.join(projectRoot, ".spectra-artifacts");
@@ -48,8 +51,11 @@ function send(response, status, body, contentType = "application/json; charset=u
 
 async function readJson(request) {
   const chunks = [];
+  let total = 0;
   for await (const chunk of request) chunks.push(chunk);
-  const raw = Buffer.concat(chunks).toString("utf8");
+  for (const chunk of chunks) total += chunk.length;
+  if (total > 8 * 1024 * 1024) throw new Error("请求内容超过 8 MB。请减少图片数量或大小后重试。");
+  const raw = Buffer.concat(chunks, total).toString("utf8");
   return raw ? JSON.parse(raw) : {};
 }
 
@@ -66,6 +72,7 @@ async function readUploadBody(request) {
 }
 
 function resolveDesktopFile(relativePath) {
+  if (publicWebMode) throw new Error("在线演示版只读取用户主动上传的文件，不会扫描电脑目录。");
   if (typeof relativePath !== "string" || !relativePath) throw new Error("请先选择一个桌面文件。");
   const resolved = path.resolve(desktopRoot, relativePath);
   const relative = path.relative(desktopRoot, resolved);
@@ -79,7 +86,17 @@ function resolveDesktopFile(relativePath) {
 function uploadedFile(reference) {
   const item = uploadedFiles.get(reference);
   if (!item) throw new Error("这份上传文件已过期；请重新上传。\n".trim());
+  if (Date.now() - item.createdAt > temporaryDataTtlMs) {
+    uploadedFiles.delete(reference);
+    throw new Error("这份上传文件已在 2 小时后自动删除；请重新上传。");
+  }
   return item;
+}
+
+function pruneTemporaryData() {
+  const expiresBefore = Date.now() - temporaryDataTtlMs;
+  for (const [reference, item] of uploadedFiles) if (item.createdAt < expiresBefore) uploadedFiles.delete(reference);
+  for (const [id, artifact] of generatedArtifacts) if (artifact.createdAt < expiresBefore) generatedArtifacts.delete(id);
 }
 
 function validateDataReference(reference) {
@@ -538,12 +555,15 @@ const agentTools = [
 
 function saveGeneratedArtifact({ filename, content, contentType, kind, plotly = null }) {
   const id = randomUUID();
-  mkdirSync(artifactDirectory, { recursive: true });
   const artifact = { filename, content, contentType, kind: kind ?? (filename.endsWith(".svg") ? "chart" : "report"), plotly, createdAt: Date.now() };
-  const binary = Buffer.isBuffer(content);
-  writeFileSync(path.join(artifactDirectory, `${id}.content`), content, binary ? undefined : "utf8");
-  writeFileSync(path.join(artifactDirectory, `${id}.json`), JSON.stringify({ filename, contentType, kind: artifact.kind, plotly, binary, createdAt: artifact.createdAt }), "utf8");
+  if (!publicWebMode) {
+    mkdirSync(artifactDirectory, { recursive: true });
+    const binary = Buffer.isBuffer(content);
+    writeFileSync(path.join(artifactDirectory, `${id}.content`), content, binary ? undefined : "utf8");
+    writeFileSync(path.join(artifactDirectory, `${id}.json`), JSON.stringify({ filename, contentType, kind: artifact.kind, plotly, binary, createdAt: artifact.createdAt }), "utf8");
+  }
   generatedArtifacts.set(id, artifact);
+  pruneTemporaryData();
   while (generatedArtifacts.size > 80) generatedArtifacts.delete(generatedArtifacts.keys().next().value);
   return { id, filename, kind: artifact.kind, url: `/api/artifacts/${id}` };
 }
@@ -552,6 +572,7 @@ function loadGeneratedArtifact(id) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
   const cached = generatedArtifacts.get(id);
   if (cached) return cached;
+  if (publicWebMode) return null;
   const metadataPath = path.join(artifactDirectory, `${id}.json`);
   const contentPath = path.join(artifactDirectory, `${id}.content`);
   if (!existsSync(metadataPath) || !existsSync(contentPath)) return null;
@@ -1002,7 +1023,14 @@ function makeReport(inspected, settings, { title = "光谱数据分析报告", f
 }
 
 async function handleApi(request, response, url) {
-  if (request.method === "GET" && url.pathname === "/api/health") return send(response, 200, { ok: true, root: "桌面（已授权）" });
+  pruneTemporaryData();
+  if (request.method === "GET" && url.pathname === "/api/config") return send(response, 200, {
+    mode: publicWebMode ? "public-web" : "local-desktop",
+    allowsDesktopSearch: !publicWebMode,
+    uploadOnly: publicWebMode,
+    temporaryDataTtlMinutes: temporaryDataTtlMs / 60_000,
+  });
+  if (request.method === "GET" && url.pathname === "/api/health") return send(response, 200, { ok: true, root: publicWebMode ? "上传文件（公共演示）" : "桌面（已授权）" });
   if (request.method === "GET" && url.pathname.startsWith("/api/artifacts/")) {
     const artifact = loadGeneratedArtifact(url.pathname.slice("/api/artifacts/".length));
     if (!artifact) throw new Error("该生成文件已过期，请重新执行任务。\n".trim());
@@ -1014,11 +1042,11 @@ async function handleApi(request, response, url) {
     return send(response, 200, artifact.content, artifact.contentType, headers);
   }
   if (request.method === "GET" && url.pathname === "/api/connector/status") return send(response, 200, {
-    mode: "local-desktop-bridge",
+    mode: publicWebMode ? "public-upload-only" : "local-desktop-bridge",
     version: "0.1.0",
-    authorizedScope: "桌面目录（本地原型固定范围）",
+    authorizedScope: publicWebMode ? "本轮用户主动上传的文件" : "桌面目录（本地原型固定范围）",
     capabilities: ["search_authorized_files", "inspect_spectrum", "parse_xlsx", "generate_chart", "generate_report"],
-    publicWebNote: "公开版将由用户选择文件/文件夹或连接已安装的桌面连接器；不会扫描未授权目录。",
+    publicWebNote: "公开版只读取用户主动上传的文件，不扫描访问者电脑目录。",
   });
   if (request.method === "POST" && url.pathname === "/api/upload") {
     const rawName = request.headers["x-spectra-filename"];
@@ -1027,10 +1055,12 @@ async function handleApi(request, response, url) {
     if (!name || !allowedExtensions.has(extension)) throw new Error("仅支持 CSV、TXT、TSV、DPT、XLSX 光谱文件。\n".trim());
     const reference = `upload:${randomUUID()}`;
     uploadedFiles.set(reference, { name, buffer: await readUploadBody(request), createdAt: Date.now() });
+    pruneTemporaryData();
     while (uploadedFiles.size > 60) uploadedFiles.delete(uploadedFiles.keys().next().value);
     return send(response, 200, { files: [await inspectFile(reference)] });
   }
   if (request.method === "GET" && url.pathname === "/api/files") {
+    if (publicWebMode) throw new Error("在线演示版不扫描访问者电脑。请点击 ＋ 上传光谱文件。");
     const query = url.searchParams.get("q")?.toLowerCase().trim() ?? "";
     const keywords = query.split(/[\s，,。！!？?：:]+/).filter((word) => word.length >= 2).filter((word) => !/^(帮我|请|读取|分析|查看|看看|文件|数据|光谱|生成|图片|报告)$/.test(word));
     const files = await findDesktopFiles();
@@ -1148,4 +1178,4 @@ createServer(async (request, response) => {
     if (!absolute.startsWith(projectRoot)) return send(response, 403, "Forbidden", "text/plain");
     return send(response, 200, await readFile(absolute), mime[path.extname(absolute)] ?? "application/octet-stream");
   } catch (error) { return send(response, 400, { error: error.message || "请求失败。" }); }
-}).listen(port, "127.0.0.1", () => console.log(`Spectra Copilot 已启动：http://127.0.0.1:${port}`));
+}).listen(port, host, () => console.log(`Spectra Copilot 已启动：http://${host}:${port}（${publicWebMode ? "公共上传演示模式" : "本地桌面模式"}）`));

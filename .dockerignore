@@ -1,0 +1,5 @@
+node_modules/
+.git/
+.spectra-artifacts/
+.DS_Store
+npm-debug.log*

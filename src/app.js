@@ -7,6 +7,7 @@ const chatInput = document.querySelector("#chat-input");
 const artifactMentions = document.querySelector("#artifact-mentions");
 const fileUpload = document.querySelector("#file-upload");
 const taskStatus = document.querySelector("#task-status");
+const deploymentBadge = document.querySelector("#deployment-badge");
 const apiSettingsButton = document.querySelector("#api-settings");
 const clearSessionButton = document.querySelector("#clear-session");
 const apiDialog = document.querySelector("#api-dialog");
@@ -20,6 +21,7 @@ const aiModel = document.querySelector("#ai-model");
 const aiEndpoint = document.querySelector("#ai-endpoint");
 const endpointField = document.querySelector("#endpoint-field");
 const apiStatus = document.querySelector("#api-status");
+const apiKeyPrivacy = document.querySelector("#api-key-privacy");
 const saveApiKeyButton = document.querySelector("#save-api-key");
 const clearApiKeyButton = document.querySelector("#clear-api-key");
 const cancelApiKeyButton = document.querySelector("#cancel-api-key");
@@ -39,6 +41,7 @@ const previewKey = "spectra-copilot-preview-open-v1";
 const selectedFiles = new Map();
 const requirements = { bandText: "", temperatureKelvin: "", temperatureText: "" };
 const aiSession = { provider: "deepseek", model: "deepseek-v4-flash", endpoint: "", apiKey: "" };
+const appConfig = { mode: "local-desktop", allowsDesktopSearch: true, uploadOnly: false, temporaryDataTtlMinutes: 0 };
 let messageHistory = [];
 let artifactGroups = [];
 let activeArtifactGroupId = "";
@@ -51,10 +54,29 @@ let stagedSpectrumFiles = [];
 let pendingTaskAfterConfirmation = "";
 sessionStorage.setItem("spectra-copilot-current-session", currentSessionId);
 
+function isPublicWeb() { return appConfig.mode === "public-web"; }
+
+function apiProfileStorage() { return isPublicWeb() ? sessionStorage : localStorage; }
+
 try { Object.assign(aiSession, JSON.parse(localStorage.getItem(apiProfileKey) || "{}")); } catch { /* 本机 API 配置读取失败时保留默认值 */ }
 
 function saveApiProfile() {
-  localStorage.setItem(apiProfileKey, JSON.stringify(aiSession));
+  apiProfileStorage().setItem(apiProfileKey, JSON.stringify(aiSession));
+}
+
+async function loadAppConfig() {
+  try {
+    const response = await fetch("/api/config");
+    if (!response.ok) return;
+    Object.assign(appConfig, await response.json());
+    if (isPublicWeb()) {
+      aiSession.apiKey = "";
+      try { Object.assign(aiSession, JSON.parse(sessionStorage.getItem(apiProfileKey) || "{}")); } catch { /* 公共演示版没有可恢复的浏览器 Key */ }
+      deploymentBadge.textContent = "ONLINE DEMO · UPLOAD-ONLY · AGENT";
+      apiKeyPrivacy.textContent = "在线演示版只在当前浏览器标签页暂存你的 Key，用于本次调用；不会保存到服务器、项目文件或服务日志。关闭标签页后会自动清除。";
+      apiKeyInput.placeholder = "仅保留在当前浏览器标签页";
+    }
+  } catch { /* 配置接口不可用时安全降级为本地模式 */ }
 }
 
 function escaped(value) {
@@ -557,7 +579,8 @@ function renderStatus() {
     requirements.temperatureText || requirements.temperatureKelvin ? `黑体 ${requirements.temperatureText || requirements.temperatureKelvin} K` : "",
   ].filter(Boolean);
   const memoryStatus = remembered.length ? ` · 已记忆：${remembered.join("，")}` : "";
-  taskStatus.textContent = count ? `本任务：${count} 个文件，${confirmed} 个已确认${model}${memoryStatus}` : `把数据和研究任务直接告诉 Agent。${model}${memoryStatus}`;
+  const idleText = isPublicWeb() ? "上传光谱文件，再把研究任务直接告诉 Agent。" : "把数据和研究任务直接告诉 Agent。";
+  taskStatus.textContent = count ? `本任务：${count} 个文件，${confirmed} 个已确认${model}${memoryStatus}` : `${idleText}${model}${memoryStatus}`;
   apiSettingsButton.textContent = aiSession.apiKey ? "AI 已连接" : "AI 设置";
 }
 
@@ -567,7 +590,7 @@ function renderApiSettings() {
   aiEndpoint.value = aiSession.endpoint;
   endpointField.classList.toggle("hidden", aiSession.provider !== "compatible");
   apiStatus.textContent = aiSession.apiKey
-    ? `已启用 ${aiSession.provider === "deepseek" ? "DeepSeek" : "兼容服务"} / ${aiSession.model}。Key 保存在此浏览器、此设备的本机存储中；新任务与刷新不会要求重填。共用电脑时请在离开前清除 Key。`
+    ? `已启用 ${aiSession.provider === "deepseek" ? "DeepSeek" : "兼容服务"} / ${aiSession.model}。${isPublicWeb() ? "Key 只在当前浏览器标签页暂存，关闭标签页后自动清除。" : "Key 保存在此浏览器、此设备的本机存储中；共用电脑时请在离开前清除 Key。"}`
     : "未连接时，Agent 仍可执行本地规则与计算工具。";
 }
 
@@ -582,7 +605,7 @@ async function request(url, options = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || "本地服务请求失败。");
+    throw new Error(data.error || "服务请求失败。");
   }
   return response;
 }
@@ -709,6 +732,7 @@ async function inspectPaths(paths, options = {}) {
 }
 
 async function searchFiles(message) {
+  if (isPublicWeb()) return addMessage("assistant", "<p>在线演示版不会扫描你的电脑。请点击输入框左侧的 ＋ 上传 CSV、TXT、TSV、DPT 或 XLSX 光谱文件。</p>");
   const response = await request(`/api/files?q=${encodeURIComponent(message)}`);
   const data = await response.json();
   if (!data.files.length) return addMessage("assistant", "<p>没有找到匹配的桌面光谱文件。请说出文件名中独特的几个字，或以后使用“选择文件/文件夹”入口授权上传。</p>");
@@ -939,7 +963,7 @@ function clearSession() {
   renderFileTray();
   renderStatus();
   renderArtifactPanel();
-  addMessage("assistant", "<p>新任务已开始。你可以说“读取所有 MXene 数据”，或直接告诉我想分析什么。</p>");
+  addMessage("assistant", `<p>新任务已开始。${isPublicWeb() ? "请点击左侧 ＋ 上传光谱文件，再告诉我想分析什么。" : "你可以说“读取所有 MXene 数据”，或直接告诉我想分析什么。"}</p>`);
 }
 
 async function restoreSession() {
@@ -954,7 +978,7 @@ async function restoreSession() {
     pendingTaskAfterConfirmation = typeof state.pendingTaskAfterConfirmation === "string" ? state.pendingTaskAfterConfirmation : "";
     Object.assign(requirements, state.requirements ?? {});
     Object.assign(aiSession, state.aiSession ?? {});
-    try { Object.assign(aiSession, JSON.parse(localStorage.getItem(apiProfileKey) || "{}")); } catch { /* 使用会话配置 */ }
+    try { Object.assign(aiSession, JSON.parse(apiProfileStorage().getItem(apiProfileKey) || "{}")); } catch { /* 使用会话配置 */ }
     restoreMessages();
     renderStatus();
     renderArtifactPanel();
@@ -984,7 +1008,7 @@ async function submitChatMessage(message, images = [], attachmentNames = []) {
   if (!aiSession.apiKey) rememberDetails(message);
   try {
     if (/(新任务|清空|重置)/.test(message)) clearSession();
-    else if (/(读取|查看|打开|文件|数据|桌面)/.test(message) && !selectedFiles.size) await searchFiles(message);
+    else if (!isPublicWeb() && /(读取|查看|打开|文件|数据|桌面)/.test(message) && !selectedFiles.size) await searchFiles(message);
     else await runAgent(message, images);
   } catch (error) { showError(error); }
 }
@@ -1049,7 +1073,7 @@ saveApiKeyButton.addEventListener("click", () => {
 });
 clearApiKeyButton.addEventListener("click", () => {
   aiSession.apiKey = "";
-  localStorage.removeItem(apiProfileKey);
+  apiProfileStorage().removeItem(apiProfileKey);
   saveSession();
   closeModal(apiDialog);
   renderStatus();
@@ -1092,5 +1116,10 @@ function initialiseResizableWorkbench() {
   });
 }
 
-initialiseResizableWorkbench();
-restoreSession();
+async function bootstrap() {
+  await loadAppConfig();
+  initialiseResizableWorkbench();
+  restoreSession();
+}
+
+bootstrap();
