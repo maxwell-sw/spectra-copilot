@@ -1,0 +1,15 @@
+{
+  "name": "spectra-copilot",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2",
+    "plotly.js-dist-min": "^2.27.0"
+  }
+}

@@ -1,0 +1,21 @@
+#!/bin/zsh
+# 本启动器只负责打开终端，并让原有启动脚本处理 Node 检查、依赖安装和本地服务。
+set -euo pipefail
+
+launcher_dir="$(cd "$(dirname "$0")/../../.." && pwd)"
+command_path="$launcher_dir/启动光谱Agent.command"
+
+if [[ ! -f "$command_path" ]]; then
+  osascript -e 'display alert "未找到启动脚本" message "请将 启动光谱Agent.app 与 启动光谱Agent.command 放在同一个项目文件夹中。" as critical'
+  exit 1
+fi
+
+osascript - "$command_path" <<'APPLESCRIPT'
+on run argv
+  set commandPath to item 1 of argv
+  tell application "Terminal"
+    activate
+    do script "bash " & quoted form of commandPath
+  end tell
+end run
+APPLESCRIPT

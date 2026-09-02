@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Spectra Copilot 本地光谱分析 Agent" />
+    <title>Spectra Copilot</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="app-header">
+        <div><p class="eyebrow">LOCAL · TOOL-USING · AGENT</p><h1>Spectra Copilot</h1><p id="task-status" class="intro">把数据和研究任务直接告诉 Agent。</p></div>
+        <div class="header-actions"><button id="toggle-preview" class="secondary" type="button">交付物预览</button><button id="history-button" class="secondary" type="button">历史</button><button id="api-settings" class="secondary" type="button">AI 设置</button><button id="clear-session" class="text-button" type="button">新任务</button></div>
+      </header>
+
+      <div class="workbench">
+        <section class="card chat-card" aria-label="光谱分析对话">
+          <div id="messages" class="messages" aria-live="polite"></div>
+          <form id="chat-form" class="chat-form">
+            <label class="attach-button" title="上传光谱文件"><input id="file-upload" type="file" accept=".csv,.txt,.tsv,.dpt,.xlsx" multiple />＋</label>
+            <div class="chat-input-wrap"><div id="image-tray" class="image-tray" aria-live="polite"></div><div id="file-tray" class="file-tray" aria-live="polite"></div><input id="chat-input" autocomplete="off" placeholder="输入任务后与附件一起发送；输入 @ 选择文件或交付物，也可直接粘贴图片" aria-label="给光谱 Agent 的消息" aria-controls="artifact-mentions" aria-expanded="false" /><div id="artifact-mentions" class="mention-menu hidden" role="listbox" aria-label="可引用的文件和交付物"></div></div>
+            <button id="send-button" class="primary" type="submit">发送</button>
+          </form>
+        </section>
+        <div id="workspace-splitter" class="workspace-splitter" role="separator" aria-label="拖动调整聊天和交付物预览宽度" aria-orientation="vertical" tabindex="0"></div>
+        <aside id="artifact-panel" class="card artifact-panel" aria-label="交付物预览"></aside>
+      </div>
+
+      <dialog id="api-dialog" class="confirm-dialog" aria-labelledby="api-title">
+        <section class="card">
+          <p class="step">模型设置 · 当前浏览器会话</p>
+          <h2 id="api-title">连接你的模型 API Key</h2>
+          <p class="muted">刷新页面后仍会保留；关闭此浏览器标签页或点击“新任务”后自动清除。Key 不写入文件或服务日志。</p>
+          <div class="settings api-settings-grid">
+            <label>服务商
+              <select id="ai-provider"><option value="deepseek">DeepSeek</option><option value="compatible">其他 OpenAI 兼容服务（仅本地测试）</option></select>
+            </label>
+            <label>模型
+              <input id="ai-model" list="deepseek-model-list" autocomplete="off" value="deepseek-v4-flash" />
+              <datalist id="deepseek-model-list">
+                <option value="deepseek-v4-flash">文字任务（快速）</option>
+                <option value="deepseek-v4-pro">文字任务（更强）</option>
+                <option value="deepseek-v4-flash-vision-exp">图片理解</option>
+              </datalist>
+            </label>
+            <label id="endpoint-field" class="wide-field hidden">兼容服务地址
+              <input id="ai-endpoint" autocomplete="off" placeholder="https://example.com/v1/chat/completions" />
+            </label>
+            <label class="wide-field">API Key
+              <input id="api-key-input" type="password" autocomplete="off" spellcheck="false" placeholder="仅用于当前浏览器会话" />
+            </label>
+          </div>
+          <p class="muted">使用 DeepSeek 时，检测到粘贴或上传的图片会仅在本轮自动切换到视觉模型；纯文字任务仍使用上方选择的模型。</p>
+          <p id="api-status" class="muted">未连接时，Agent 仍可执行本地规则与计算工具。</p>
+          <div class="dialog-actions"><button id="cancel-api-key" class="secondary" type="button">取消</button><button id="clear-api-key" class="secondary" type="button">清除 Key</button><button id="save-api-key" class="primary" type="button">保存并启用</button></div>
+        </section>
+      </dialog>
+      <dialog id="history-dialog" class="confirm-dialog" aria-labelledby="history-title">
+        <section class="card history-card">
+          <div class="preview-heading"><div><p class="step">本机历史</p><h2 id="history-title">会话与交付物</h2></div><button id="close-history" class="preview-close" type="button" aria-label="关闭历史">×</button></div>
+          <p class="muted">历史仅保存在这台电脑的浏览器中，不保存 API Key。删除后无法从历史列表恢复。</p>
+          <div id="history-list" class="history-list"></div>
+        </section>
+      </dialog>
+    </main>
+    <script src="./node_modules/plotly.js-dist-min/plotly.min.js"></script>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
