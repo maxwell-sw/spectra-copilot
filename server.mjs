@@ -24,6 +24,19 @@ const uploadedFiles = new Map();
 const generatedArtifacts = new Map();
 const artifactDirectory = path.join(projectRoot, ".spectra-artifacts");
 const legacyDemoPath = process.env.SPECTRA_LEGACY_DEMO_PATH ?? path.join(projectRoot, "assets", "光谱计算器（最终版）.html");
+const demoDataDirectory = path.join(projectRoot, "demo-data");
+const bundledDemoFiles = new Map([
+  ["demo:IR-Candidate-01_50.csv", "IR-Candidate-01_50.csv"],
+  ["demo:IR-Candidate-02_150.csv", "IR-Candidate-02_150.csv"],
+  ["demo:IR-Candidate-03_250.csv", "IR-Candidate-03_250.csv"],
+  ["demo:IR-Candidate-04_350.csv", "IR-Candidate-04_350.csv"],
+  ["demo:IR-Candidate-05_450.csv", "IR-Candidate-05_450.csv"],
+]);
+const managedDemoApiKey = publicWebMode ? String(process.env.SPECTRA_DEMO_API_KEY ?? "").trim() : "";
+const managedDemoRunLimit = Math.max(1, Math.min(10, Number(process.env.SPECTRA_DEMO_RUN_LIMIT ?? 3) || 3));
+const managedDemoWindowMs = 10 * 60 * 1000;
+const managedDemoRuns = new Map();
+const managedDemoModel = process.env.SPECTRA_DEMO_MODEL ?? "deepseek-v4-flash";
 
 async function loadLegacyAstmg173() {
   try {
@@ -93,6 +106,12 @@ function uploadedFile(reference) {
   return item;
 }
 
+function bundledDemoFile(reference) {
+  const name = bundledDemoFiles.get(reference);
+  if (!name) return null;
+  return { name, absolute: path.join(demoDataDirectory, name), kind: "demo" };
+}
+
 function pruneTemporaryData() {
   const expiresBefore = Date.now() - temporaryDataTtlMs;
   for (const [reference, item] of uploadedFiles) if (item.createdAt < expiresBefore) uploadedFiles.delete(reference);
@@ -101,6 +120,11 @@ function pruneTemporaryData() {
 
 function validateDataReference(reference) {
   if (typeof reference === "string" && reference.startsWith("upload:")) return uploadedFile(reference);
+  if (typeof reference === "string" && reference.startsWith("demo:")) {
+    const file = bundledDemoFile(reference);
+    if (!file) throw new Error("未知的演示数据引用。");
+    return file;
+  }
   resolveDesktopFile(reference);
   return null;
 }
@@ -168,19 +192,19 @@ function readXlsx(buffer) {
 }
 
 async function inspectFile(relativePath) {
-  const uploaded = validateDataReference(relativePath);
-  const absolute = uploaded ? null : resolveDesktopFile(relativePath);
-  const details = uploaded ? { size: uploaded.buffer.length } : await stat(absolute);
+  const stored = validateDataReference(relativePath);
+  const absolute = stored?.absolute ?? (stored ? null : resolveDesktopFile(relativePath));
+  const details = stored?.buffer ? { size: stored.buffer.length } : await stat(absolute);
   if (details.size > maxFileBytes) throw new Error("文件超过 20 MB，本机 Agent 不会读取。`".replace("`", ""));
-  const buffer = uploaded ? uploaded.buffer : await readFile(absolute);
-  const extension = uploaded ? path.extname(uploaded.name).toLowerCase() : path.extname(absolute).toLowerCase();
+  const buffer = stored?.buffer ?? await readFile(absolute);
+  const extension = stored ? path.extname(stored.name).toLowerCase() : path.extname(absolute).toLowerCase();
   const source = extension === ".xlsx"
     ? readXlsx(buffer)
     : (() => { const content = decodeText(buffer); return { parsed: parseSpectrumText(content), headerText: content.split(/\r?\n/).slice(0, 8).join(" ") }; })();
-  const name = uploaded ? uploaded.name : path.basename(absolute);
+  const name = stored ? stored.name : path.basename(absolute);
   const metadata = inferSpectrumMetadata({ fileName: name, headerText: source.headerText, points: source.parsed.points });
   return {
-    file: { path: relativePath, name, size: details.size, origin: uploaded ? "upload" : "desktop" },
+    file: { path: relativePath, name, size: details.size, origin: stored?.kind ?? (stored ? "upload" : "desktop") },
     parsed: source.parsed,
     headerText: String(source.headerText ?? "").slice(0, 1200),
     metadata,
@@ -334,6 +358,23 @@ function requireSafeApiKey(apiKey, provider) {
   if (/[^\x21-\x7e]/.test(key) || /\s/.test(key)) throw new Error("API Key 中包含中文、空格或换行。请只粘贴 Key 本身，不要包含“API Key：”等文字。\n".trim());
   if (provider === "deepseek" && !/^sk-[A-Za-z0-9_-]+$/.test(key)) throw new Error("DeepSeek API Key 应以 sk- 开头。请在 AI 设置中重新粘贴平台生成的 Key。\n".trim());
   return key;
+}
+
+function clientAddress(request) {
+  const forwarded = String(request.headers["x-forwarded-for"] ?? "").split(",")[0].trim();
+  return forwarded || request.socket.remoteAddress || "unknown";
+}
+
+function claimManagedDemoKey(request, paths) {
+  if (!publicWebMode || !managedDemoApiKey) throw new Error("在线演示暂未配置服务端体验额度，请在 AI 设置中填入自己的 Key。");
+  if (paths.length !== bundledDemoFiles.size || !paths.every((item) => bundledDemoFiles.has(item))) throw new Error("服务端体验额度只用于内置的 5 份演示数据。上传自己的文件时请在 AI 设置中填入自己的 Key。");
+  const now = Date.now();
+  const address = clientAddress(request);
+  const recent = (managedDemoRuns.get(address) ?? []).filter((time) => now - time < managedDemoWindowMs);
+  if (recent.length >= managedDemoRunLimit) throw new Error(`演示额度已用完：每个访问者每 10 分钟最多 ${managedDemoRunLimit} 次。请稍后再试，或在 AI 设置中填入自己的 Key。`);
+  recent.push(now);
+  managedDemoRuns.set(address, recent);
+  return managedDemoApiKey;
 }
 
 function modelConnectionError(error, providerLabel) {
@@ -1050,8 +1091,11 @@ async function handleApi(request, response, url) {
     allowsDesktopSearch: !publicWebMode,
     uploadOnly: publicWebMode,
     temporaryDataTtlMinutes: temporaryDataTtlMs / 60_000,
+    managedDemoAvailable: Boolean(managedDemoApiKey),
+    managedDemoRunLimit: managedDemoApiKey ? managedDemoRunLimit : 0,
   });
   if (request.method === "GET" && url.pathname === "/api/health") return send(response, 200, { ok: true, root: publicWebMode ? "上传文件（公共演示）" : "桌面（已授权）" });
+  if (request.method === "GET" && url.pathname === "/api/demo-samples") return send(response, 200, { files: await Promise.all([...bundledDemoFiles.keys()].map((reference) => inspectFile(reference))) });
   if (request.method === "GET" && url.pathname.startsWith("/api/artifacts/")) {
     const artifact = loadGeneratedArtifact(url.pathname.slice("/api/artifacts/".length));
     if (!artifact) throw new Error("该生成文件已过期，请重新执行任务。\n".trim());
@@ -1141,6 +1185,11 @@ async function handleApi(request, response, url) {
   if (request.method === "POST" && url.pathname === "/api/agent/stream") {
     const body = await readJson(request);
     const paths = Array.isArray(body.paths) && body.paths.length ? uniqueApprovedPaths(body.paths) : [];
+    const useManagedDemoKey = body.useManagedDemoKey === true && !String(body.apiKey ?? "").trim();
+    const apiKey = useManagedDemoKey ? claimManagedDemoKey(request, paths) : body.apiKey;
+    const provider = useManagedDemoKey ? "deepseek" : body.provider;
+    const endpoint = useManagedDemoKey ? "" : body.endpoint;
+    const model = useManagedDemoKey ? managedDemoModel : body.model;
     const files = await Promise.all(paths.map((filePath) => inspectFile(filePath)));
     const byPath = new Map((body.confirmations ?? []).filter((item) => item?.path).map((item) => [item.path, item]));
     const withConfirmations = files.map((file) => ({ ...file, confirmation: byPath.get(file.file.path) }));
@@ -1149,7 +1198,7 @@ async function handleApi(request, response, url) {
     const heartbeat = setInterval(() => response.write(": keep-alive\n\n"), 15_000);
     try {
       const localPlan = buildTaskPlan({ task: body.task, files: withConfirmations });
-      const agent = await runDeepSeekAgent({ apiKey: body.apiKey, provider: body.provider, endpoint: body.endpoint, model: body.model, task: body.task, images: body.images, conversation: body.conversation, requirements: body.requirements, fileInterpretations: body.fileInterpretations, activeArtifact: body.activeArtifact, files: withConfirmations, localPlan, onEvent: (event) => emit("progress", event) });
+      const agent = await runDeepSeekAgent({ apiKey, provider, endpoint, model, task: body.task, images: body.images, conversation: body.conversation, requirements: body.requirements, fileInterpretations: body.fileInterpretations, activeArtifact: body.activeArtifact, files: withConfirmations, localPlan, onEvent: (event) => emit("progress", event) });
       emit("complete", { agent });
     } catch (error) { emit("error", { error: error.message || "Agent 运行失败。", partial: error.agentPartial ?? null }); }
     clearInterval(heartbeat);

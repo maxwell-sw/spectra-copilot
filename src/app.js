@@ -44,7 +44,7 @@ const previewKey = "spectra-copilot-preview-open-v1";
 const selectedFiles = new Map();
 const requirements = { bandText: "", temperatureKelvin: "", temperatureText: "" };
 const aiSession = { provider: "deepseek", model: "deepseek-v4-flash", endpoint: "", apiKey: "" };
-const appConfig = { mode: "local-desktop", allowsDesktopSearch: true, uploadOnly: false, temporaryDataTtlMinutes: 0 };
+const appConfig = { mode: "local-desktop", allowsDesktopSearch: true, uploadOnly: false, temporaryDataTtlMinutes: 0, managedDemoAvailable: false, managedDemoRunLimit: 0 };
 let messageHistory = [];
 let artifactGroups = [];
 let activeArtifactGroupId = "";
@@ -58,16 +58,20 @@ let pendingTaskAfterConfirmation = "";
 sessionStorage.setItem("spectra-copilot-current-session", currentSessionId);
 
 const demoSamples = [
-  { source: "/demo-data/demo-50.csv", name: "演示样品-50.csv" },
-  { source: "/demo-data/demo-150.csv", name: "演示样品-150.csv" },
-  { source: "/demo-data/demo-250.csv", name: "演示样品-250.csv" },
-  { source: "/demo-data/demo-350.csv", name: "演示样品-350.csv" },
-  { source: "/demo-data/demo-450.csv", name: "演示样品-450.csv" },
+  { name: "IR-Candidate-01_50.csv" },
+  { name: "IR-Candidate-02_150.csv" },
+  { name: "IR-Candidate-03_250.csv" },
+  { name: "IR-Candidate-04_350.csv" },
+  { name: "IR-Candidate-05_450.csv" },
 ];
 const demoSampleNames = new Set(demoSamples.map((sample) => sample.name));
-const recommendedDemoTask = "请以这 5 份演示样品为候选材料，完成一次可审计的红外隐身材料初筛。已确认：横轴为 μm，Y 列为反射率 R（%），样品近似不透明（T≈0）；因此仅在本批数据与该假设下，可用 ε≈1−R 作为相对热辐射表征。请在 3–5 μm 与 8–14 μm 波段、300 K 黑体权重下调用受控工具，计算每个样品的 Weighted 反射率并排序，给出最优候选；生成一张 5 条曲线的对比谱图和一份面试展示型 HTML 筛选报告。结论请明确区分工具事实、在此假设下的工程判断，以及仍需补测或验证的条件。";
+const recommendedDemoTask = "请以这 5 份 IR-Candidate 演示样品为候选材料，完成一次可审计的红外隐身材料初筛。已确认：横轴为 μm，Y 列为反射率 R（%），样品近似不透明（T≈0）；因此仅在本批数据与该假设下，可用 ε≈1−R 作为相对热辐射表征。请在 3–5 μm 与 8–14 μm 波段、300 K 黑体权重下调用受控工具，计算每个样品的 Weighted 反射率并排序，给出最优候选；生成一张 5 条曲线的对比谱图和一份面试展示型 HTML 筛选报告。结论请明确区分工具事实、在此假设下的工程判断，以及仍需补测或验证的条件。";
 
 function isPublicWeb() { return appConfig.mode === "public-web"; }
+
+function hasManagedDemoAccess() { return isPublicWeb() && appConfig.managedDemoAvailable === true; }
+
+function hasAgentAccess() { return Boolean(aiSession.apiKey || hasManagedDemoAccess()); }
 
 function apiProfileStorage() { return isPublicWeb() ? sessionStorage : localStorage; }
 
@@ -86,7 +90,7 @@ async function loadAppConfig() {
       aiSession.apiKey = "";
       try { Object.assign(aiSession, JSON.parse(sessionStorage.getItem(apiProfileKey) || "{}")); } catch { /* 公共演示版没有可恢复的浏览器 Key */ }
       deploymentBadge.textContent = "ONLINE DEMO · UPLOAD-ONLY · AGENT";
-      apiKeyPrivacy.textContent = "在线演示版只在当前浏览器标签页暂存你的 Key，用于本次调用；不会保存到服务器、项目文件或服务日志。关闭标签页后会自动清除。";
+      apiKeyPrivacy.textContent = appConfig.managedDemoAvailable ? "引导演示可使用服务端受控的临时额度；你自己的 Key 只在当前浏览器标签页暂存，不会保存到服务器、项目文件或服务日志。" : "在线演示版只在当前浏览器标签页暂存你的 Key，用于本次调用；不会保存到服务器、项目文件或服务日志。关闭标签页后会自动清除。";
       apiKeyInput.placeholder = "仅保留在当前浏览器标签页";
     }
   } catch { /* 配置接口不可用时安全降级为本地模式 */ }
@@ -211,9 +215,15 @@ function demoConfirmation(path) {
   return { path, unit: "um", valueType: "reflectance", valueUnit: "percent", opaque: true };
 }
 
-function hasLoadedDemoSamples() {
+function stagedDemoEntries() {
+  return stagedSpectrumFiles.filter((entry) => demoSampleNames.has(entry.file.name));
+}
+
+function selectedDemoEntries() {
   return [...selectedFiles.values()].filter((item) => demoSampleNames.has(item.file.name)).length === demoSamples.length;
 }
+
+function hasPreparedDemoSamples() { return stagedDemoEntries().length === demoSamples.length || selectedDemoEntries(); }
 
 function hasNonDemoSamples() {
   return [...selectedFiles.values()].some((item) => !demoSampleNames.has(item.file.name));
@@ -226,37 +236,39 @@ function fillRecommendedDemoTask() {
 
 async function loadDemoSamples() {
   if (hasNonDemoSamples()) throw new Error("当前任务已经包含你的文件。为避免把演示数据与真实数据混在一起，请先点击右上角“新任务”再载入演示。" );
-  if (hasLoadedDemoSamples()) {
-    fillRecommendedDemoTask();
-    return;
-  }
+  if (hasPreparedDemoSamples()) return;
   loadDemoButton.disabled = true;
   loadDemoButton.textContent = "正在载入…";
   try {
-    const files = await Promise.all(demoSamples.map(async (sample) => {
-      const response = await fetch(sample.source);
-      if (!response.ok) throw new Error(`无法读取演示文件 ${sample.name}。`);
-      return new File([await response.blob()], sample.name, { type: "text/csv" });
-    }));
-    await stageAndUploadFiles(files, { inferUnits: false });
-    const entries = stagedSpectrumFiles.filter((entry) => demoSampleNames.has(entry.file.name));
-    const readyEntries = entries.filter((entry) => entry.status === "ready");
     stagedSpectrumFiles = stagedSpectrumFiles.filter((entry) => !demoSampleNames.has(entry.file.name));
     renderFileTray();
-    if (readyEntries.length !== demoSamples.length) throw new Error("部分演示文件没有成功解析，请刷新后重试。" );
-    addInspections(readyEntries.flatMap((entry) => entry.inspections), { announce: false, showConfirmation: false });
-    readyEntries.flatMap((entry) => entry.inspections).forEach((item) => updateFile(item.file.path, { confirmation: demoConfirmation(item.file.path) }));
-    requirements.bandText = "3-5；8-14";
-    requirements.temperatureKelvin = "300";
-    requirements.temperatureText = "300";
-    saveSession();
-    renderStatus();
-    fillRecommendedDemoTask();
-    addMessage("assistant", "<p><b>演示数据已就绪：</b>5 份样例已作为同一批候选材料载入，并使用已公开的演示前提完成确认。推荐任务已填入输入框；点击“运行 Agent”即可展示任务理解、受控工具调用、加权比较、对比图与筛选报告。</p><p class=\"muted\">演示结论只适用于这批数据、3–5 / 8–14 μm、300 K 及不透明假设；它不会替代真实材料的角分辨、温度依赖或发射率实测验证。</p>");
+    const response = await request("/api/demo-samples");
+    const data = await response.json();
+    const inspections = Array.isArray(data.files) ? data.files : [];
+    if (inspections.length !== demoSamples.length) throw new Error("演示数据没有完整加载，请刷新后重试。" );
+    stagedSpectrumFiles.push(...inspections.map((inspection) => ({ id: crypto.randomUUID(), file: new File([], inspection.file.name, { type: "text/csv" }), status: "ready", progress: 100, inspections: [inspection], error: "", xhr: null, cancelled: false, demo: true })));
+    renderFileTray();
+    addMessage("assistant", "<p><b>已选择 5 份演示数据。</b>它们现在显示在输入框上方，可逐份点击 × 移除；此时尚未加入任务，也没有预填任何指令。你可以点击“02 填入推荐任务”查看和修改任务，再发送；或点击“03 启动筛选任务”直接体验完整工作流。</p>");
   } finally {
     loadDemoButton.disabled = false;
-    loadDemoButton.textContent = "1. 载入演示数据";
+    loadDemoButton.textContent = "选择 5 份演示数据";
   }
+}
+
+function promoteDemoSamplesForRun() {
+  const entries = stagedDemoEntries().filter((entry) => entry.status === "ready");
+  if (entries.length === demoSamples.length) {
+    stagedSpectrumFiles = stagedSpectrumFiles.filter((entry) => !demoSampleNames.has(entry.file.name));
+    renderFileTray();
+    addInspections(entries.flatMap((entry) => entry.inspections), { announce: false, showConfirmation: false });
+    entries.flatMap((entry) => entry.inspections).forEach((item) => updateFile(item.file.path, { confirmation: demoConfirmation(item.file.path) }));
+  }
+  if (!selectedDemoEntries()) throw new Error("请先完整选择 5 份演示数据；如移除了某份文件，请重新点击“01 选择 5 份演示数据”。");
+  requirements.bandText = "3-5；8-14";
+  requirements.temperatureKelvin = "300";
+  requirements.temperatureText = "300";
+  saveSession();
+  renderStatus();
 }
 
 function mentionItems() {
@@ -656,7 +668,7 @@ function renderApiSettings() {
   endpointField.classList.toggle("hidden", aiSession.provider !== "compatible");
   apiStatus.textContent = aiSession.apiKey
     ? `已启用 ${aiSession.provider === "deepseek" ? "DeepSeek" : "兼容服务"} / ${aiSession.model}。${isPublicWeb() ? "Key 只在当前浏览器标签页暂存，关闭标签页后自动清除。" : "Key 保存在此浏览器、此设备的本机存储中；共用电脑时请在离开前清除 Key。"}`
-    : "未连接时，Agent 仍可执行本地规则与计算工具。";
+    : hasManagedDemoAccess() ? `引导演示可使用服务端受控额度（每个访问者每 10 分钟最多 ${appConfig.managedDemoRunLimit} 次）；上传自己的数据时仍请填入自己的 Key。` : "未连接时，Agent 仍可执行本地规则与计算工具。";
 }
 
 function apiKeyProblem(key, provider) {
@@ -825,7 +837,8 @@ function taskPayload(task, images = []) {
     confidence: item.aiInference?.confidence ?? item.metadata?.wavelength?.confidence ?? "low",
     reason: item.aiInference?.reason ?? item.metadata?.wavelength?.reason ?? "",
   }));
-  return { task, images: images.map((image) => image.dataUrl).filter((value) => typeof value === "string"), conversation: messageHistory.slice(-30).map((item) => ({ role: item.role, content: toPlainText(item.html) })), paths: [...selectedFiles.keys()], confirmations: [...selectedFiles.values()].map((item) => item.confirmation).filter(Boolean), fileInterpretations, requirements, activeArtifact: activeArtifact ? { id: activeArtifact.id, filename: activeArtifact.filename, kind: activeGroup.kind, version: activeGroup.activeIndex + 1, isRevisionTarget: Boolean(pendingRevisionGroupId) } : null, provider: aiSession.provider, endpoint: aiSession.endpoint, apiKey: aiSession.apiKey, model: aiSession.model };
+  const usesOnlyDemoFiles = selectedFiles.size === demoSamples.length && [...selectedFiles.values()].every((item) => demoSampleNames.has(item.file.name));
+  return { task, images: images.map((image) => image.dataUrl).filter((value) => typeof value === "string"), conversation: messageHistory.slice(-30).map((item) => ({ role: item.role, content: toPlainText(item.html) })), paths: [...selectedFiles.keys()], confirmations: [...selectedFiles.values()].map((item) => item.confirmation).filter(Boolean), fileInterpretations, requirements, activeArtifact: activeArtifact ? { id: activeArtifact.id, filename: activeArtifact.filename, kind: activeGroup.kind, version: activeGroup.activeIndex + 1, isRevisionTarget: Boolean(pendingRevisionGroupId) } : null, provider: aiSession.provider, endpoint: aiSession.endpoint, apiKey: aiSession.apiKey, useManagedDemoKey: !aiSession.apiKey && hasManagedDemoAccess() && usesOnlyDemoFiles, model: aiSession.model };
 }
 
 function inferRevisionTarget(message) {
@@ -924,22 +937,22 @@ function missingCalculationDetails(task) {
 }
 
 async function runAgent(task, images = []) {
-  if (!selectedFiles.size && !images.length && !aiSession.apiKey) return addMessage("assistant", "<p>请先告诉我需要读取哪个文件，例如“读取所有 MXene 数据”，或直接粘贴一张图片。</p>");
+  if (!selectedFiles.size && !images.length && !hasAgentAccess()) return addMessage("assistant", "<p>请先告诉我需要读取哪个文件，例如“读取所有 MXene 数据”，或直接粘贴一张图片。</p>");
   const allConfirmed = [...selectedFiles.values()].every((item) => item.confirmation);
   const calculationIntent = /(计算|加权|weighted|分析|比较|对比|筛选|图|曲线|绘|报告|结论|生成|太阳|黑体|波段|积分|指标)/i.test(String(task ?? ""));
-  if (!aiSession.apiKey && selectedFiles.size && !allConfirmed && calculationIntent) {
+  if (!hasAgentAccess() && selectedFiles.size && !allConfirmed && calculationIntent) {
     pendingTaskAfterConfirmation = task;
     saveSession();
     confirmationCard();
     return;
   }
-  const missingDetails = !aiSession.apiKey && selectedFiles.size && allConfirmed ? missingCalculationDetails(task) : "";
+  const missingDetails = !hasAgentAccess() && selectedFiles.size && allConfirmed ? missingCalculationDetails(task) : "";
   if (missingDetails) {
     const guided = await requestSessionGuide({ phase: "need-input", userMessage: task, missingDetails });
     if (!guided) addMessage("assistant", `<p>${missingDetails}</p>`);
     return;
   }
-  if (!aiSession.apiKey) return addMessage("assistant", "<p>你现在处于本地规则模式，无法理解“是的”这类依赖上下文的话。请先在右上角 AI 设置中启用自己的模型 Key；之后我会保留对话上下文，并由模型选择工具执行任务。</p>");
+  if (!hasAgentAccess()) return addMessage("assistant", "<p>你现在处于本地规则模式，无法理解“是的”这类依赖上下文的话。请先在右上角 AI 设置中启用自己的模型 Key；之后我会保留对话上下文，并由模型选择工具执行任务。</p>");
   const timeline = createRunTimeline();
   try {
     const agent = await streamAgent(task, timeline, images);
@@ -1112,17 +1125,18 @@ fileUpload.addEventListener("change", () => {
 });
 loadDemoButton.addEventListener("click", () => loadDemoSamples().catch(showError));
 fillDemoTaskButton.addEventListener("click", () => {
-  if (!hasLoadedDemoSamples()) addMessage("assistant", "<p>请先点击“1. 载入演示数据”。</p>");
+  if (!hasPreparedDemoSamples()) addMessage("assistant", "<p>请先点击“01 选择 5 份演示数据”。</p>");
   else fillRecommendedDemoTask();
 });
 runDemoButton.addEventListener("click", async () => {
   try {
-    if (!hasLoadedDemoSamples()) await loadDemoSamples();
-    if (!aiSession.apiKey) {
+    if (!hasPreparedDemoSamples()) throw new Error("请先点击“01 选择 5 份演示数据”。");
+    promoteDemoSamplesForRun();
+    if (!hasAgentAccess()) {
       apiKeyInput.value = "";
       renderApiSettings();
       if (!apiDialog.open) apiDialog.showModal();
-      addMessage("assistant", "<p>演示数据已经准备好。填入自己的模型 Key 后，点击“3. 运行 Agent”即可开始；Key 只用于当前浏览器会话。</p>");
+      addMessage("assistant", "<p>演示数据已经准备好。填入自己的模型 Key 后，点击“03 启动筛选任务”即可开始；Key 只用于当前浏览器会话。</p>");
       return;
     }
     fillRecommendedDemoTask();
