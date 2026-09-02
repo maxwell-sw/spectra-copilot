@@ -96,6 +96,8 @@ npm start
 
 ## 在线演示版：让任何人通过链接体验
 
+**在线体验：<https://spectra-copilot.onrender.com/>**
+
 仓库可以以公共上传模式部署为 HTTPS 网页。访问者打开链接后上传自己的光谱文件，再在浏览器中填入自己的 DeepSeek 或兼容模型 Key，即可使用同一套 Agent、工具调用、图表和报告能力。
 
 - 本地开发默认仍是 Desktop 模式；公共部署必须设置 `SPECTRA_MODE=public`。
