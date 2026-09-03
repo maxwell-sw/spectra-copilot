@@ -553,7 +553,7 @@ function activeArtifactGroup() {
 function setPreviewOpen(open) {
   previewIsOpen = Boolean(open);
   workbench.classList.toggle("preview-closed", !previewIsOpen);
-  togglePreviewButton.textContent = previewIsOpen ? "隐藏预览" : "交付物预览";
+  togglePreviewButton.textContent = previewIsOpen ? "隐藏成果" : "查看成果";
   localStorage.setItem(previewKey, previewIsOpen ? "open" : "closed");
 }
 
@@ -611,7 +611,7 @@ function renderArtifactPanel() {
   if (group) activeArtifactGroupId = group.id;
   if (!group) {
     const closed = artifactGroups.filter((item) => closedArtifactGroupIds.has(item.id));
-    artifactPanel.innerHTML = closed.length ? `<p class="step">02 · DELIVERABLES</p><h2>预览已关闭</h2><p class="muted">交付物仍被保留；你可以随时重新打开。</p><div class="closed-artifacts">${closed.map((item) => `<button class="secondary" data-reopen-artifact="${escaped(item.id)}">重新打开 ${escaped(item.label)}</button>`).join("")}</div>` : `<p class="step">02 · DELIVERABLES</p><h2>等待 Agent 生成交付物</h2><p class="muted">完成分析后，对比谱图、候选排序和 HTML 报告会直接出现在这里；选中预览后可继续迭代。</p>`;
+    artifactPanel.innerHTML = closed.length ? `<p class="step">交付物</p><h2>预览已关闭</h2><p class="muted">交付物仍被保留；你可以随时重新打开。</p><div class="closed-artifacts">${closed.map((item) => `<button class="secondary" data-reopen-artifact="${escaped(item.id)}">重新打开 ${escaped(item.label)}</button>`).join("")}</div>` : `<p class="step">交付物</p><h2>等待生成分析成果</h2><p class="muted">完成分析后，对比谱图、候选排序和 HTML 报告会直接出现在这里；选中预览后可继续迭代。</p>`;
     artifactPanel.querySelectorAll("[data-reopen-artifact]").forEach((button) => button.addEventListener("click", () => { closedArtifactGroupIds.delete(button.dataset.reopenArtifact); activeArtifactGroupId = button.dataset.reopenArtifact; setPreviewOpen(true); saveSession(); renderArtifactPanel(); }));
     return;
   }
@@ -627,7 +627,7 @@ function renderArtifactPanel() {
   const download = isChart ? `<button class="secondary" type="button" data-download-plotly>下载当前版本（Plotly SVG）</button>` : `<a class="download-link" href="${escaped(active.url)}" download="${escaped(active.filename)}">下载当前版本</a>`;
   const visibleGroups = artifactGroups.filter((item) => !closedArtifactGroupIds.has(item.id));
   const closedGroups = artifactGroups.filter((item) => closedArtifactGroupIds.has(item.id));
-  artifactPanel.innerHTML = `<div class="preview-heading"><p class="step">02 · DELIVERABLES · ${visibleGroups.length} 项打开</p><button class="preview-close" data-close-artifact aria-label="关闭当前交付物" title="关闭当前交付物">×</button></div><details class="artifact-picker" open><summary>展开选择交付物</summary><div class="artifact-tabs">${visibleGroups.map((item) => `<span class="artifact-tab-wrap"><button class="artifact-tab ${item.id === group.id ? "active" : ""}" data-artifact-group="${escaped(item.id)}" title="${escaped(item.label)}">${escaped(item.label)}</button><button class="artifact-tab-close" data-delete-artifact="${escaped(item.id)}" title="关闭此预览（可重新打开）" aria-label="关闭 ${escaped(item.label)}">×</button></span>`).join("")}</div>${closedGroups.length ? `<div class="closed-artifacts"><p class="muted">已关闭的预览</p>${closedGroups.map((item) => `<button class="secondary" data-reopen-artifact="${escaped(item.id)}">重新打开：${escaped(item.label)}</button>`).join("")}</div>` : ""}</details><h2>${escaped(active.filename)}</h2><div class="version-controls"><button class="secondary" data-version-previous ${group.activeIndex === 0 ? "disabled" : ""}>← 上一版</button><span>版本 ${group.activeIndex + 1} / ${group.versions.length}</span><button class="secondary" data-version-next ${group.activeIndex >= group.versions.length - 1 ? "disabled" : ""}>下一版 →</button></div>${preview}<div class="artifact-download">${download}</div><div class="revision-box"><label for="revision-input">继续修改这个交付物</label><textarea id="revision-input" placeholder="例如：把曲线改为红色；把坐标轴和图例做成答辩风格；报告改成论文结果段的结构"></textarea><button id="revision-submit" class="primary" type="button">交给 Agent 修改</button><p class="muted">修改会写入当前交付物的下一版本；可用上方按钮回退或前进。</p></div>`;
+  artifactPanel.innerHTML = `<div class="preview-heading"><p class="step">交付物 · ${visibleGroups.length} 项已打开</p><button class="preview-close" data-close-artifact aria-label="关闭当前交付物" title="关闭当前交付物">×</button></div><details class="artifact-picker" open><summary>选择要查看的交付物</summary><div class="artifact-tabs">${visibleGroups.map((item) => `<span class="artifact-tab-wrap"><button class="artifact-tab ${item.id === group.id ? "active" : ""}" data-artifact-group="${escaped(item.id)}" title="${escaped(item.label)}">${escaped(item.label)}</button><button class="artifact-tab-close" data-delete-artifact="${escaped(item.id)}" title="关闭此预览（可重新打开）" aria-label="关闭 ${escaped(item.label)}">×</button></span>`).join("")}</div>${closedGroups.length ? `<div class="closed-artifacts"><p class="muted">已关闭的预览</p>${closedGroups.map((item) => `<button class="secondary" data-reopen-artifact="${escaped(item.id)}">重新打开：${escaped(item.label)}</button>`).join("")}</div>` : ""}</details><h2>${escaped(active.filename)}</h2><div class="version-controls"><button class="secondary" data-version-previous ${group.activeIndex === 0 ? "disabled" : ""}>← 上一版</button><span>版本 ${group.activeIndex + 1} / ${group.versions.length}</span><button class="secondary" data-version-next ${group.activeIndex >= group.versions.length - 1 ? "disabled" : ""}>下一版 →</button></div>${preview}<div class="artifact-download">${download}</div><div class="revision-box"><label for="revision-input">继续修改这个交付物</label><textarea id="revision-input" placeholder="例如：把曲线改为红色；把坐标轴和图例做成答辩风格；报告改成论文结果段的结构"></textarea><button id="revision-submit" class="primary" type="button">交给 Agent 修改</button><p class="muted">修改会写入当前交付物的下一版本；可用上方按钮回退或前进。</p></div>`;
   artifactPanel.querySelector("[data-close-artifact]").addEventListener("click", () => { closedArtifactGroupIds.add(group.id); saveSession(); renderArtifactPanel(); });
   artifactPanel.querySelectorAll("[data-artifact-group]").forEach((button) => button.addEventListener("click", () => {
     activeArtifactGroupId = button.dataset.artifactGroup;
@@ -691,15 +691,15 @@ function saveSession() {
 function renderStatus() {
   const count = selectedFiles.size;
   const confirmed = [...selectedFiles.values()].filter((item) => item.confirmation).length;
-  const model = aiSession.apiKey ? ` · AI：${aiSession.provider === "deepseek" ? "DeepSeek" : "兼容服务"}` : " · 本地规则模式";
+  const model = aiSession.apiKey ? ` · 模型：${aiSession.provider === "deepseek" ? "DeepSeek" : "兼容服务"}` : " · 本地规则模式";
   const remembered = [
     requirements.bandText ? `波段 ${requirements.bandText} μm` : "",
     requirements.temperatureText || requirements.temperatureKelvin ? `黑体 ${requirements.temperatureText || requirements.temperatureKelvin} K` : "",
   ].filter(Boolean);
   const memoryStatus = remembered.length ? ` · 已记忆：${remembered.join("，")}` : "";
-  const idleText = isPublicWeb() ? "上传光谱文件，再把研究任务直接告诉 Agent。" : "把数据和研究任务直接告诉 Agent。";
+  const idleText = isPublicWeb() ? "上传光谱文件，直接描述你的研究任务。" : "添加数据，描述你的研究任务。";
   taskStatus.textContent = count ? `本任务：${count} 个文件，${confirmed} 个已确认${model}${memoryStatus}` : `${idleText}${model}${memoryStatus}`;
-  apiSettingsButton.textContent = aiSession.apiKey ? "AI 已连接" : "AI 设置";
+  apiSettingsButton.textContent = aiSession.apiKey ? "模型已连接" : "模型连接";
 }
 
 function renderApiSettings() {
@@ -1177,7 +1177,7 @@ runDemoButton.addEventListener("click", async () => {
       apiKeyInput.value = "";
       renderApiSettings();
       if (!apiDialog.open) apiDialog.showModal();
-      addMessage("assistant", "<p>演示数据已经准备好。填入自己的模型 Key 后，点击“03 生成筛选报告”即可开始；Key 只用于当前浏览器会话。</p>");
+      addMessage("assistant", "<p>演示数据已经准备好。填入自己的模型 Key 后，点击“运行完整演示”即可开始；Key 只用于当前浏览器会话。</p>");
       return;
     }
     fillRecommendedDemoTask();

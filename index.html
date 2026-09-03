@@ -10,18 +10,18 @@
   <body>
     <main class="shell">
       <header class="app-header">
-        <div class="brand-block"><div class="brand-line"><strong>S</strong><h1>Spectra Copilot</h1><span id="deployment-badge" class="eyebrow">LOCAL · AGENT WORKSPACE</span></div><p id="task-status" class="intro">材料光谱决策工作台 · 从原始数据到可审计结论</p></div>
-        <div class="header-actions"><button id="toggle-preview" class="secondary" type="button">交付物预览</button><button id="history-button" class="secondary" type="button">历史</button><button id="api-settings" class="secondary" type="button">AI 设置</button><button id="clear-session" class="text-button" type="button">新任务</button></div>
+        <div class="brand-block"><div class="brand-line"><strong>S</strong><h1>Spectra Copilot</h1><span id="deployment-badge" class="eyebrow">材料光谱决策系统</span></div><p id="task-status" class="intro">材料光谱决策工作台 · 从原始数据到可审计结论</p></div>
+        <div class="header-actions"><button id="toggle-preview" class="secondary" type="button">查看成果</button><button id="history-button" class="secondary" type="button">历史记录</button><button id="api-settings" class="secondary" type="button">模型连接</button><button id="clear-session" class="text-button" type="button">新建研究</button></div>
       </header>
 
       <section class="demo-card" aria-labelledby="demo-title">
-        <div class="demo-copy"><p class="step">STARTER WORKFLOW · 2 MINUTES</p><h2 id="demo-title">红外候选材料 · 快速筛选</h2><p>选择一组真实光谱，Agent 将完成条件确认、黑体加权、候选排序、对比图与 HTML 报告。适合第一次体验完整能力链路。</p><div class="demo-metrics"><span><b>05</b> 候选样品</span><span><b>3–5 / 8–14</b> μm</span><span><b>300</b> K 黑体权重</span></div><p class="demo-assumption">输出边界：演示假设为 μm / 反射率 R（%）/ 不透明样品；结论会明确标注适用条件，而非替代工程验证。</p></div>
-        <div class="demo-actions"><div class="demo-action"><span>01</span><button id="load-demo" class="primary" type="button">载入候选光谱</button></div><div class="demo-action"><span>02</span><button id="fill-demo-task" class="secondary" type="button">查看推荐任务</button></div><div class="demo-action"><span>03</span><button id="run-demo" class="secondary" type="button">生成筛选报告</button></div></div>
+        <div class="demo-copy"><p class="step">演示工作流 · 约 2 分钟</p><h2 id="demo-title">从光谱数据，到可解释的材料结论</h2><p>用 5 份真实样本完成一次红外候选材料初筛：确认条件、黑体加权、候选排序，并交付对比谱图与分析报告。</p><div class="demo-metrics"><span><b>5</b> 份候选样品</span><span><b>3–5 / 8–14</b> μm 评估窗口</span><span><b>300 K</b> 黑体权重</span></div><p class="demo-assumption">演示边界：数据按 μm / 反射率 R（%）/ 不透明样品处理；系统会将计算事实、工程判断与待验证条件分开呈现。</p></div>
+        <div class="demo-actions" aria-label="演示工作流"><div class="demo-action"><span>准备数据</span><button id="load-demo" class="primary" type="button">载入 5 份演示光谱</button></div><div class="demo-action"><span>确认任务</span><button id="fill-demo-task" class="secondary" type="button">查看任务说明</button></div><div class="demo-action"><span>得到结论</span><button id="run-demo" class="secondary" type="button">运行完整演示</button></div></div>
       </section>
 
       <div class="workbench">
         <section class="card chat-card" aria-label="光谱分析对话">
-          <div class="workspace-panel-head"><div><p class="step">01 · RESEARCH BRIEF</p><h2>研究任务与数据</h2></div><span>支持 CSV · TXT · TSV · DPT · XLSX</span></div>
+          <div class="workspace-panel-head"><div><p class="step">研究工作区</p><h2>任务与数据</h2></div><span>支持 CSV · TXT · TSV · DPT · XLSX</span></div>
           <div id="messages" class="messages" aria-live="polite"></div>
           <form id="chat-form" class="chat-form">
             <label class="attach-button" title="上传光谱文件"><input id="file-upload" type="file" accept=".csv,.txt,.tsv,.dpt,.xlsx" multiple />＋</label>
