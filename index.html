@@ -10,17 +10,18 @@
   <body>
     <main class="shell">
       <header class="app-header">
-        <div><p id="deployment-badge" class="eyebrow">LOCAL · TOOL-USING · AGENT</p><h1>Spectra Copilot</h1><p id="task-status" class="intro">把数据和研究任务直接告诉 Agent。</p></div>
+        <div class="brand-block"><div class="brand-line"><strong>S</strong><h1>Spectra Copilot</h1><span id="deployment-badge" class="eyebrow">LOCAL · AGENT WORKSPACE</span></div><p id="task-status" class="intro">材料光谱决策工作台 · 从原始数据到可审计结论</p></div>
         <div class="header-actions"><button id="toggle-preview" class="secondary" type="button">交付物预览</button><button id="history-button" class="secondary" type="button">历史</button><button id="api-settings" class="secondary" type="button">AI 设置</button><button id="clear-session" class="text-button" type="button">新任务</button></div>
       </header>
 
       <section class="demo-card" aria-labelledby="demo-title">
-        <div class="demo-copy"><p class="step">GUIDED BENCHMARK</p><h2 id="demo-title">红外候选材料 · 快速筛选</h2><p>5 个候选样品 · 2 个目标波段 · 1 份可审计报告。用一个完整任务展示从光谱数据到材料判断的 Agent 工作流。</p><div class="demo-metrics"><span><b>05</b> 候选样品</span><span><b>3–5 / 8–14</b> μm</span><span><b>300</b> K 黑体权重</span></div><p class="demo-assumption">演示前提：横轴为 μm、Y 值为反射率 R（%）、样品近似不透明（T≈0）。结论仅适用于该数据与假设，并会在报告中标出验证边界。</p></div>
-        <div class="demo-actions"><div class="demo-action"><span>01</span><button id="load-demo" class="primary" type="button">选择 5 份演示数据</button></div><div class="demo-action"><span>02</span><button id="fill-demo-task" class="secondary" type="button">填入推荐任务</button></div><div class="demo-action"><span>03</span><button id="run-demo" class="secondary" type="button">启动筛选任务</button></div></div>
+        <div class="demo-copy"><p class="step">STARTER WORKFLOW · 2 MINUTES</p><h2 id="demo-title">红外候选材料 · 快速筛选</h2><p>选择一组真实光谱，Agent 将完成条件确认、黑体加权、候选排序、对比图与 HTML 报告。适合第一次体验完整能力链路。</p><div class="demo-metrics"><span><b>05</b> 候选样品</span><span><b>3–5 / 8–14</b> μm</span><span><b>300</b> K 黑体权重</span></div><p class="demo-assumption">输出边界：演示假设为 μm / 反射率 R（%）/ 不透明样品；结论会明确标注适用条件，而非替代工程验证。</p></div>
+        <div class="demo-actions"><div class="demo-action"><span>01</span><button id="load-demo" class="primary" type="button">载入候选光谱</button></div><div class="demo-action"><span>02</span><button id="fill-demo-task" class="secondary" type="button">查看推荐任务</button></div><div class="demo-action"><span>03</span><button id="run-demo" class="secondary" type="button">生成筛选报告</button></div></div>
       </section>
 
       <div class="workbench">
         <section class="card chat-card" aria-label="光谱分析对话">
+          <div class="workspace-panel-head"><div><p class="step">01 · RESEARCH BRIEF</p><h2>研究任务与数据</h2></div><span>支持 CSV · TXT · TSV · DPT · XLSX</span></div>
           <div id="messages" class="messages" aria-live="polite"></div>
           <form id="chat-form" class="chat-form">
             <label class="attach-button" title="上传光谱文件"><input id="file-upload" type="file" accept=".csv,.txt,.tsv,.dpt,.xlsx" multiple />＋</label>
