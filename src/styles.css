@@ -622,3 +622,66 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .demo-actions button { text-align: left; }
   .card, .chat-card, .artifact-panel { border-radius: 13px; }
 }
+
+/* The composer is an instrument command bar: one focus ring, one baseline, no chat-app bulk. */
+.chat-form {
+  align-items: flex-end;
+  gap: 9px;
+  padding: 12px 14px 14px;
+}
+.chat-input-wrap {
+  min-height: 43px;
+  border: 1px solid #d5e0eb;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .88);
+  box-shadow: inset 0 1px 2px rgba(35, 65, 94, .02);
+}
+.chat-input-wrap:focus-within {
+  border-color: #478ce4;
+  box-shadow: 0 0 0 2px rgba(55, 130, 229, .17), inset 0 1px 2px rgba(35, 65, 94, .02);
+}
+.chat-form input {
+  min-height: 41px;
+  padding: 10px 13px;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: none !important;
+  color: var(--spectra-ink);
+  font-size: 14px;
+  line-height: 1.4;
+}
+.chat-form input:focus, .chat-form input:focus-visible {
+  outline: 0;
+  box-shadow: none !important;
+}
+.chat-form input::placeholder { color: #91a1b4; }
+.attach-button {
+  align-self: flex-end;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
+  border-color: #d5e0eb;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .72);
+  color: #2a73d7;
+  box-shadow: none;
+  font-size: 23px;
+}
+.attach-button:hover { border-color: #9fc1ea; background: #f5f9ff; }
+.chat-form .primary {
+  flex: 0 0 108px;
+  width: 108px;
+  min-height: 42px;
+  max-width: 108px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: #1768d8;
+  box-shadow: none;
+  font-size: 13px;
+}
+.chat-form .primary:hover { background: #105cc9; box-shadow: 0 5px 11px rgba(23, 104, 216, .18); }
+@media (max-width: 640px) {
+  .chat-form { gap: 8px; }
+  .chat-form .primary { width: 100%; max-width: none; }
+}
