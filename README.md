@@ -1,5 +1,11 @@
 # Spectra Copilot
 
+<p align="right"><a href="README_EN.md">English</a> | <strong>中文</strong></p>
+
+<p align="center">
+  <img src="assets/readme-hero.png" alt="Spectra Copilot: spectral curves, candidate materials, and a controlled Agent workflow" width="100%" />
+</p>
+
 ### 面向材料、光学与热管理研究的可审计光谱分析 Agent
 
 从原始光谱到可解释的材料决策。Spectra Copilot 不是把若干计算按钮包装成聊天框：你提供研究任务和已授权的数据，它会理解目标、补齐必要条件、调用受控的本地计算工具，并交付可复算的图、表、候选排序与 HTML 报告。
