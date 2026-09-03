@@ -234,6 +234,12 @@ function fillRecommendedDemoTask() {
   chatInput.focus();
 }
 
+function addDemoReadyMessage() {
+  const article = addMessage("assistant", "<p><b>5 份演示光谱已准备好。</b>它们显示在输入框上方，可逐份点击 × 移除；现在还没有发送任务。你可以先查看并修改推荐任务，再点击发送；也可以直接运行完整演示。</p><div class=\"demo-inline-actions\"><button class=\"secondary\" type=\"button\" data-demo-task>查看并编辑推荐任务</button><button class=\"primary\" type=\"button\" data-demo-run>直接运行完整演示</button></div>");
+  article.querySelector("[data-demo-task]").addEventListener("click", fillRecommendedDemoTask);
+  article.querySelector("[data-demo-run]").addEventListener("click", () => runRecommendedDemo().catch(showError));
+}
+
 async function loadDemoSamples() {
   if (hasNonDemoSamples()) throw new Error("当前任务已经包含你的文件。为避免把演示数据与真实数据混在一起，请先点击右上角“新任务”再载入演示。" );
   if (hasPreparedDemoSamples()) return;
@@ -248,7 +254,7 @@ async function loadDemoSamples() {
     if (inspections.length !== demoSamples.length) throw new Error("演示数据没有完整加载，请刷新后重试。" );
     stagedSpectrumFiles.push(...inspections.map((inspection) => ({ id: crypto.randomUUID(), file: new File([], inspection.file.name, { type: "text/csv" }), status: "ready", progress: 100, inspections: [inspection], error: "", xhr: null, cancelled: false, demo: true })));
     renderFileTray();
-    addMessage("assistant", "<p><b>已载入 5 份演示数据。</b>它们现在显示在输入框上方，可逐份点击 × 移除；此时尚未加入任务，也没有预填任何指令。你可以点击“02 查看推荐任务”阅读和修改任务，再发送；或点击“03 生成筛选报告”直接体验完整工作流。</p>");
+    addDemoReadyMessage();
   } finally {
     loadDemoButton.disabled = false;
     loadDemoButton.textContent = "已载入 5 份候选光谱";
@@ -269,6 +275,20 @@ function promoteDemoSamplesForRun() {
   requirements.temperatureText = "300";
   saveSession();
   renderStatus();
+}
+
+async function runRecommendedDemo() {
+  if (!hasPreparedDemoSamples()) throw new Error("请先载入 5 份候选光谱。");
+  promoteDemoSamplesForRun();
+  if (!hasAgentAccess()) {
+    apiKeyInput.value = "";
+    renderApiSettings();
+    if (!apiDialog.open) apiDialog.showModal();
+    addMessage("assistant", "<p>演示数据已经准备好。填入自己的模型 Key 后，点击“运行完整演示”即可开始；Key 只用于当前浏览器会话。</p>");
+    return;
+  }
+  fillRecommendedDemoTask();
+  await submitChatMessage(recommendedDemoTask);
 }
 
 function mentionItems() {
@@ -442,8 +462,20 @@ function recoverRequirementsFromHistory() {
   Object.assign(requirements, rebuildCalculationRequirements(requirements, userMessages, { hasBlackbodySource: hasBlackbodySource() }));
 }
 
+function sessionHasHistoryContent(state = {}) {
+  const history = Array.isArray(state.messageHistory) ? state.messageHistory : [];
+  const artifacts = Array.isArray(state.artifactGroups) ? state.artifactGroups : [];
+  return history.some((item) => item?.role === "user") || artifacts.length > 0;
+}
+
 function historyEntries() {
-  try { return JSON.parse(localStorage.getItem(historyKey) || "[]"); } catch { return []; }
+  try {
+    const rawEntries = JSON.parse(localStorage.getItem(historyKey) || "[]");
+    const entries = Array.isArray(rawEntries) ? rawEntries : [];
+    const meaningfulEntries = entries.filter((entry) => entry?.id && sessionHasHistoryContent(entry));
+    if (meaningfulEntries.length !== entries.length) localStorage.setItem(historyKey, JSON.stringify(meaningfulEntries));
+    return meaningfulEntries;
+  } catch { return []; }
 }
 
 function sessionTitle() {
@@ -453,6 +485,10 @@ function sessionTitle() {
 
 function saveHistorySnapshot() {
   const snapshot = { id: currentSessionId, title: sessionTitle(), updatedAt: Date.now(), messageHistory, files: serializableFiles(), requirements, artifactGroups, closedArtifactGroupIds: [...closedArtifactGroupIds] };
+  if (!sessionHasHistoryContent(snapshot)) {
+    localStorage.setItem(historyKey, JSON.stringify(historyEntries().filter((item) => item?.id !== currentSessionId)));
+    return;
+  }
   const next = [snapshot, ...historyEntries().filter((item) => item?.id !== currentSessionId)].slice(0, 30);
   localStorage.setItem(historyKey, JSON.stringify(next));
 }
@@ -1060,7 +1096,7 @@ function rememberDetails(message) {
 function showError(error) { addMessage("assistant", `<p class="error-text">${escaped(error.message)}</p>`); }
 
 function clearSession() {
-  if (messageHistory.length || artifactGroups.length) saveHistorySnapshot();
+  if (sessionHasHistoryContent({ messageHistory, artifactGroups })) saveHistorySnapshot();
   stagedSpectrumFiles.forEach((entry) => { entry.cancelled = true; entry.xhr?.abort(); });
   sessionStorage.removeItem(sessionKey);
   currentSessionId = crypto.randomUUID();
@@ -1166,24 +1202,10 @@ fileUpload.addEventListener("change", () => {
 });
 loadDemoButton.addEventListener("click", () => loadDemoSamples().catch(showError));
 fillDemoTaskButton.addEventListener("click", () => {
-  if (!hasPreparedDemoSamples()) addMessage("assistant", "<p>请先点击“01 载入候选光谱”。</p>");
+  if (!hasPreparedDemoSamples()) addMessage("assistant", "<p>请先载入 5 份候选光谱。</p>");
   else fillRecommendedDemoTask();
 });
-runDemoButton.addEventListener("click", async () => {
-  try {
-    if (!hasPreparedDemoSamples()) throw new Error("请先点击“01 载入候选光谱”。");
-    promoteDemoSamplesForRun();
-    if (!hasAgentAccess()) {
-      apiKeyInput.value = "";
-      renderApiSettings();
-      if (!apiDialog.open) apiDialog.showModal();
-      addMessage("assistant", "<p>演示数据已经准备好。填入自己的模型 Key 后，点击“运行完整演示”即可开始；Key 只用于当前浏览器会话。</p>");
-      return;
-    }
-    fillRecommendedDemoTask();
-    await submitChatMessage(recommendedDemoTask);
-  } catch (error) { showError(error); }
-});
+runDemoButton.addEventListener("click", () => runRecommendedDemo().catch(showError));
 
 apiSettingsButton.addEventListener("click", () => {
   apiKeyInput.value = aiSession.apiKey;

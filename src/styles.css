@@ -568,6 +568,22 @@ body {
 }
 .chat-input-wrap { border: 1px solid #d4dfeb; border-radius: 10px; box-shadow: inset 0 1px 2px rgba(35, 65, 94, .025); }
 .chat-form input { min-height: 43px; border: 0; border-radius: 10px; background: transparent; }
+
+/* The two work areas are related, but the gutter should stay visually quiet. */
+.workspace-splitter { margin: 0 12px; background: transparent; }
+.workspace-splitter:hover, .workspace-splitter:focus { background: transparent; box-shadow: none; }
+.workspace-splitter::after { display: none; }
+
+.demo-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(190, 207, 224, .64);
+}
+.demo-inline-actions button { min-height: 34px; padding: 7px 11px; border-radius: 8px; font-size: 12px; }
+.demo-inline-actions .secondary { background: rgba(255, 255, 255, .78); }
 .chat-input-wrap:focus-within { border-color: #77aceb; box-shadow: 0 0 0 4px rgba(75, 143, 227, .12); }
 .attach-button { width: 43px; min-width: 43px; border-radius: 10px; }
 .chat-form .primary { min-height: 43px; border-radius: 10px; }
@@ -621,6 +637,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .demo-action + .demo-action { border-top: 1px solid rgba(189, 207, 226, .72); border-left: 0; }
   .demo-actions button { text-align: left; }
   .card, .chat-card, .artifact-panel { border-radius: 13px; }
+  .demo-inline-actions { align-items: stretch; flex-direction: column; }
+  .demo-inline-actions button { width: 100%; }
 }
 
 /* Mobile is a single research flow: chat first, deliverables below it — never a squeezed desktop split view. */
