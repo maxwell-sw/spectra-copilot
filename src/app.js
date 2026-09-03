@@ -383,7 +383,7 @@ function bindWeightedExportControls(article, rows = []) {
 
 function restoreMessages() {
   messages.innerHTML = "";
-  messageHistory.forEach((item) => addMessage(item.role, item.html, { remember: false }));
+  messageHistory.filter((item) => !(item.role === "assistant" && /已恢复上次任务：/.test(item.html))).forEach((item) => addMessage(item.role, item.html, { remember: false }));
 }
 
 function serializableFiles() {
@@ -968,8 +968,8 @@ async function runAgent(task, images = []) {
     rememberArtifacts(agent.artifacts);
     timeline.article.querySelector(".run-card").innerHTML = `<div class="run-status success"><i class="run-indicator" aria-hidden="true"></i><div><b>分析已完成</b><small>已生成结果；执行记录可用于追溯工具调用</small></div><time>${formatElapsed(total)}</time></div><details><summary>查看执行记录</summary><ol>${agent.trace.map((item) => `<li><span>${formatElapsed(item.elapsedMs ?? total)}</span><b>${escaped(item.tool)}</b>：${escaped(item.resultSummary)}</li>`).join("")}<li><span>${formatElapsed(total)}</span>完成答复整理</li></ol></details><p class="muted">这里仅记录工具调用与返回结果，不展示模型私密推理。</p>`;
     const artifactItems = (agent.artifacts ?? []).filter((artifact) => artifactKind(artifact) !== "data").map((artifact) => `<button class="secondary inline-preview-button" type="button" data-open-artifact-id="${escaped(artifact.id)}">预览 ${escaped(artifact.filename)}</button>`).join("");
-    const artifactActions = artifactItems ? `<div class="artifact-links">${artifactItems}</div>` : "";
-    const weightedActions = Array.isArray(agent.weightedRows) && agent.weightedRows.length ? `<div class="weighted-export"><span>导出本次加权计算结果：</span><button class="secondary" type="button" data-weighted-export="csv">下载 CSV</button><button class="secondary" type="button" data-weighted-export="xlsx">下载 Excel</button></div>` : "";
+    const artifactActions = artifactItems ? `<div class="artifact-links"><span class="artifact-links-label">本次交付物</span><div>${artifactItems}</div></div>` : "";
+    const weightedActions = Array.isArray(agent.weightedRows) && agent.weightedRows.length ? `<div class="weighted-export"><div><b>加权计算数据</b><span>导出本次可复算的指标结果</span></div><div><button class="secondary" type="button" data-weighted-export="csv">下载 CSV</button><button class="secondary" type="button" data-weighted-export="xlsx">下载 Excel</button></div></div>` : "";
     const finalArticle = await typeIntoRunMessage(timeline.article, agent.answer, { footer: `${artifactActions}${weightedActions}<p class="muted">模型：${escaped(agent.model)}${agent.usage ? ` · ${agent.usage.totalTokens ?? "未知"} tokens` : ""}</p>` });
     bindWeightedExportControls(finalArticle, agent.weightedRows);
   } catch (error) {
@@ -1066,7 +1066,7 @@ async function restoreSession() {
       if (!aiSession.apiKey) recoverRequirementsFromHistory();
       renderStatus();
       const remembered = [requirements.bandText ? `波段 ${requirements.bandText} μm` : "", requirements.temperatureText || requirements.temperatureKelvin ? `黑体温度 ${requirements.temperatureText || requirements.temperatureKelvin} K` : ""].filter(Boolean);
-      addMessage("assistant", `<p>已恢复上次任务：${files.length} 个已授权文件${remembered.length ? `，并恢复了${escaped(remembered.join("、"))}` : ""}。你可以继续告诉我下一步。</p>`);
+      addMessage("assistant", `<p>已恢复上次任务：${files.length} 个已授权文件${remembered.length ? `，并恢复了${escaped(remembered.join("、"))}` : ""}。你可以继续告诉我下一步。</p>`, { remember: false });
     }
   } catch {
     clearSession();

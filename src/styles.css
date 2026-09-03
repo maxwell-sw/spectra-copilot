@@ -327,3 +327,25 @@ button, .primary, .secondary, .text-button { min-height: 34px; border-radius: 6p
 .reply-table th, .reply-table td { border-color: #e2e8f0; }
 @keyframes agentPulse { 50% { opacity: .5; transform: scale(.82); } }
 @media (max-width: 640px) { .chat-message.user { max-width: 92%; } .run-card { padding: 14px; } .run-status small { max-width: 220px; } }
+
+/* Result delivery: turn dense chat-side controls and the report frame into product-grade panels. */
+.artifact-links { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 12px; margin: 16px 0 10px; padding: 11px 12px; border: 1px solid #dbe5f2; border-radius: 8px; background: #f8fafc; }
+.artifact-links-label { color: #64748b; font-size: 12px; font-weight: 750; letter-spacing: .03em; }
+.artifact-links > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.artifact-links .inline-preview-button { min-height: 31px; padding: 6px 9px; border-color: #cbdcf5; background: #fff; color: #1d4ed8; font-size: 12px; }
+.artifact-links .inline-preview-button:hover { border-color: #60a5fa; background: #eff6ff; }
+.weighted-export { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 10px 0 14px; padding: 12px; border: 1px solid #dbe5f2; border-radius: 8px; background: #f8fafc; color: #334155; }
+.weighted-export > div:first-child { display: grid; gap: 2px; }
+.weighted-export b { color: #334155; font-size: 13px; }
+.weighted-export span { color: #7c8da2; font-size: 12px; }
+.weighted-export > div:last-child { display: flex; flex: 0 0 auto; gap: 7px; }
+.weighted-export .secondary { min-height: 31px; padding: 6px 9px; border-color: #cbd5e1; background: #fff; color: #475569; font-size: 12px; }
+.weighted-export .secondary:hover { border-color: #60a5fa; background: #eff6ff; color: #1d4ed8; }
+.report-open-card { padding: 0; overflow: hidden; border: 1px solid #dbe5f2; border-radius: 9px; background: #fff; box-shadow: 0 3px 12px rgba(15, 23, 42, .055); }
+.artifact-preview { border: 0; border-radius: 0; }
+.report-preview { height: min(62vh, 620px); min-height: 410px; border-bottom: 1px solid #e2e8f0; background: #fff; }
+.report-preview iframe { background: #fff; }
+.report-open { margin: 0; min-height: 42px; padding: 10px 14px; border-radius: 0; background: #2563eb; font-size: 13px; }
+.report-open:hover { background: #1d4ed8; }
+.artifact-download { margin-top: 12px; }
+@media (max-width: 640px) { .artifact-links { grid-template-columns: 1fr; gap: 7px; } .weighted-export { align-items: flex-start; flex-direction: column; } }
