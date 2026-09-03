@@ -32,7 +32,11 @@ const bundledDemoFiles = new Map([
   ["demo:IR-Candidate-04_350.csv", "IR-Candidate-04_350.csv"],
   ["demo:IR-Candidate-05_450.csv", "IR-Candidate-05_450.csv"],
 ]);
-const managedDemoApiKey = publicWebMode ? String(process.env.SPECTRA_DEMO_API_KEY ?? "").trim() : "";
+// The public deployment and the optional macOS launcher can both provide a
+// managed demo key.  The launcher reads it from the user's Keychain at run
+// time; the key is never stored in this repository or returned to the browser.
+const managedDemoEnabled = publicWebMode || process.env.SPECTRA_ENABLE_LOCAL_DEMO_KEY === "1";
+const managedDemoApiKey = managedDemoEnabled ? String(process.env.SPECTRA_DEMO_API_KEY ?? "").trim() : "";
 const managedDemoRunLimit = Math.max(1, Math.min(10, Number(process.env.SPECTRA_DEMO_RUN_LIMIT ?? 3) || 3));
 const managedDemoWindowMs = 10 * 60 * 1000;
 const managedDemoRuns = new Map();
@@ -366,7 +370,7 @@ function clientAddress(request) {
 }
 
 function claimManagedDemoKey(request, paths) {
-  if (!publicWebMode || !managedDemoApiKey) throw new Error("在线演示暂未配置服务端体验额度，请在 AI 设置中填入自己的 Key。");
+  if (!managedDemoEnabled || !managedDemoApiKey) throw new Error("演示模式暂未配置服务端体验额度，请在 AI 设置中填入自己的 Key。");
   if (paths.length !== bundledDemoFiles.size || !paths.every((item) => bundledDemoFiles.has(item))) throw new Error("服务端体验额度只用于内置的 5 份演示数据。上传自己的文件时请在 AI 设置中填入自己的 Key。");
   const now = Date.now();
   const address = clientAddress(request);

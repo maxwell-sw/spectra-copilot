@@ -69,7 +69,7 @@ const recommendedDemoTask = "请以这 5 份 IR-Candidate 演示样品为候选�
 
 function isPublicWeb() { return appConfig.mode === "public-web"; }
 
-function hasManagedDemoAccess() { return isPublicWeb() && appConfig.managedDemoAvailable === true; }
+function hasManagedDemoAccess() { return appConfig.managedDemoAvailable === true; }
 
 function hasAgentAccess() { return Boolean(aiSession.apiKey || hasManagedDemoAccess()); }
 
