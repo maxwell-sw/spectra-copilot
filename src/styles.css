@@ -525,7 +525,7 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85);
   backdrop-filter: blur(12px);
 }
-.demo-action { position: relative; gap: 7px; padding: 7px 8px; }
+.demo-action { position: relative; display: grid; grid-template-columns: 1fr; gap: 7px; padding: 7px 8px; }
 .demo-action + .demo-action { border-left: 1px solid rgba(189, 207, 226, .72); }
 .demo-action > span {
   padding-left: 2px;
@@ -621,6 +621,30 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .demo-action + .demo-action { border-top: 1px solid rgba(189, 207, 226, .72); border-left: 0; }
   .demo-actions button { text-align: left; }
   .card, .chat-card, .artifact-panel { border-radius: 13px; }
+}
+
+/* Mobile is a single research flow: chat first, deliverables below it — never a squeezed desktop split view. */
+@media (max-width: 980px) {
+  .workbench, .workbench.preview-closed {
+    display: block;
+    grid-template-columns: 1fr;
+  }
+  .workspace-splitter { display: none; }
+  .artifact-panel {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    max-height: none;
+    margin: 16px 0 0;
+    padding: 16px;
+  }
+  .workbench.preview-closed .artifact-panel { display: none; }
+}
+
+@media (max-width: 640px) {
+  .messages { min-height: 330px; }
+  .demo-action { padding: 9px 10px; }
+  .demo-action > span { padding-left: 0; }
 }
 
 /* The composer is an instrument command bar: one focus ring, one baseline, no chat-app bulk. */
