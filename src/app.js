@@ -248,10 +248,10 @@ async function loadDemoSamples() {
     if (inspections.length !== demoSamples.length) throw new Error("演示数据没有完整加载，请刷新后重试。" );
     stagedSpectrumFiles.push(...inspections.map((inspection) => ({ id: crypto.randomUUID(), file: new File([], inspection.file.name, { type: "text/csv" }), status: "ready", progress: 100, inspections: [inspection], error: "", xhr: null, cancelled: false, demo: true })));
     renderFileTray();
-    addMessage("assistant", "<p><b>已选择 5 份演示数据。</b>它们现在显示在输入框上方，可逐份点击 × 移除；此时尚未加入任务，也没有预填任何指令。你可以点击“02 填入推荐任务”查看和修改任务，再发送；或点击“03 启动筛选任务”直接体验完整工作流。</p>");
+    addMessage("assistant", "<p><b>已载入 5 份演示数据。</b>它们现在显示在输入框上方，可逐份点击 × 移除；此时尚未加入任务，也没有预填任何指令。你可以点击“02 查看推荐任务”阅读和修改任务，再发送；或点击“03 生成筛选报告”直接体验完整工作流。</p>");
   } finally {
     loadDemoButton.disabled = false;
-    loadDemoButton.textContent = "选择 5 份演示数据";
+    loadDemoButton.textContent = "已载入 5 份候选光谱";
   }
 }
 
@@ -263,7 +263,7 @@ function promoteDemoSamplesForRun() {
     addInspections(entries.flatMap((entry) => entry.inspections), { announce: false, showConfirmation: false });
     entries.flatMap((entry) => entry.inspections).forEach((item) => updateFile(item.file.path, { confirmation: demoConfirmation(item.file.path) }));
   }
-  if (!selectedDemoEntries()) throw new Error("请先完整选择 5 份演示数据；如移除了某份文件，请重新点击“01 选择 5 份演示数据”。");
+  if (!selectedDemoEntries()) throw new Error("请先完整载入 5 份候选光谱；如移除了某份文件，请重新点击“01 载入候选光谱”。");
   requirements.bandText = "3-5；8-14";
   requirements.temperatureKelvin = "300";
   requirements.temperatureText = "300";
@@ -862,7 +862,7 @@ function formatElapsed(milliseconds) {
 }
 
 function createRunTimeline() {
-  const article = addMessage("assistant", `<div class="run-card"><p><b>Agent 正在运行</b> <span data-run-clock>00:00</span></p><ol data-run-steps><li><span>00:00</span> 已接收任务</li><li class="active"><span>00:00</span> 正在读取任务条件</li></ol></div>`, { remember: false });
+  const article = addMessage("assistant", `<div class="run-card" aria-live="polite"><div class="run-status"><i class="run-indicator" aria-hidden="true"></i><div><b>Agent 正在执行分析</b><small>正在理解任务、核验数据并编排计算工具</small></div><time data-run-clock>00:00</time></div><ol data-run-steps><li><span>00:00</span>已接收任务</li><li class="active"><span>00:00</span>正在读取任务条件</li></ol></div>`, { remember: false });
   const startedAt = Date.now();
   const clock = article.querySelector("[data-run-clock]");
   const active = article.querySelector(".active span");
@@ -966,7 +966,7 @@ async function runAgent(task, images = []) {
     saveSession();
     renderStatus();
     rememberArtifacts(agent.artifacts);
-    timeline.article.querySelector(".run-card").innerHTML = `<p><b>Agent 已完成</b> <span>${formatElapsed(total)}</span></p><details><summary>展开查看执行记录</summary><ol>${agent.trace.map((item) => `<li><span>${formatElapsed(item.elapsedMs ?? total)}</span><b>${escaped(item.tool)}</b>：${escaped(item.resultSummary)}</li>`).join("")}<li><span>${formatElapsed(total)}</span>完成答复整理</li></ol></details><p class="muted">这里只记录做了什么和工具返回什么；不展示模型私密推理。</p>`;
+    timeline.article.querySelector(".run-card").innerHTML = `<div class="run-status success"><i class="run-indicator" aria-hidden="true"></i><div><b>分析已完成</b><small>已生成结果；执行记录可用于追溯工具调用</small></div><time>${formatElapsed(total)}</time></div><details><summary>查看执行记录</summary><ol>${agent.trace.map((item) => `<li><span>${formatElapsed(item.elapsedMs ?? total)}</span><b>${escaped(item.tool)}</b>：${escaped(item.resultSummary)}</li>`).join("")}<li><span>${formatElapsed(total)}</span>完成答复整理</li></ol></details><p class="muted">这里仅记录工具调用与返回结果，不展示模型私密推理。</p>`;
     const artifactItems = (agent.artifacts ?? []).filter((artifact) => artifactKind(artifact) !== "data").map((artifact) => `<button class="secondary inline-preview-button" type="button" data-open-artifact-id="${escaped(artifact.id)}">预览 ${escaped(artifact.filename)}</button>`).join("");
     const artifactActions = artifactItems ? `<div class="artifact-links">${artifactItems}</div>` : "";
     const weightedActions = Array.isArray(agent.weightedRows) && agent.weightedRows.length ? `<div class="weighted-export"><span>导出本次加权计算结果：</span><button class="secondary" type="button" data-weighted-export="csv">下载 CSV</button><button class="secondary" type="button" data-weighted-export="xlsx">下载 Excel</button></div>` : "";
@@ -988,7 +988,7 @@ async function runAgent(task, images = []) {
       ? partial.trace.map((item) => `<li><span>${formatElapsed(item.elapsedMs ?? elapsed)}</span><b>${escaped(item.tool)}</b>：${escaped(item.resultSummary)}</li>`).join("")
       : timeline.events.map((item) => `<li><span>${formatElapsed(elapsed)}</span>${escaped(item.label)}</li>`).join("");
     const preserved = partial?.artifacts?.length ? `<p class="muted">失败前已经生成的 ${partial.artifacts.length} 个交付物已保留在侧边预览中。</p>` : "";
-    timeline.article.querySelector(".run-card").innerHTML = `<p><b>Agent 运行未完成</b> <span>${formatElapsed(elapsed)}</span></p><p class="error-text">${escaped(error.message)}</p><details open><summary>查看失败前的完整执行记录</summary><ol>${trace}</ol></details>${preserved}<button class="secondary retry-agent" type="button">重试本次任务</button>`;
+    timeline.article.querySelector(".run-card").innerHTML = `<div class="run-status failed"><i class="run-indicator" aria-hidden="true"></i><div><b>本次分析未完成</b><small>${formatElapsed(elapsed)}</small></div></div><p class="error-text">${escaped(error.message)}</p><details open><summary>查看失败前的执行记录</summary><ol>${trace}</ol></details>${preserved}<button class="secondary retry-agent" type="button">重试本次任务</button>`;
     timeline.article.querySelector(".retry-agent")?.addEventListener("click", () => runAgent(task, images));
     messageHistory.push({ role: "assistant", html: timeline.article.querySelector(".message-content").innerHTML });
     messageHistory = messageHistory.slice(-80);
@@ -1125,18 +1125,18 @@ fileUpload.addEventListener("change", () => {
 });
 loadDemoButton.addEventListener("click", () => loadDemoSamples().catch(showError));
 fillDemoTaskButton.addEventListener("click", () => {
-  if (!hasPreparedDemoSamples()) addMessage("assistant", "<p>请先点击“01 选择 5 份演示数据”。</p>");
+  if (!hasPreparedDemoSamples()) addMessage("assistant", "<p>请先点击“01 载入候选光谱”。</p>");
   else fillRecommendedDemoTask();
 });
 runDemoButton.addEventListener("click", async () => {
   try {
-    if (!hasPreparedDemoSamples()) throw new Error("请先点击“01 选择 5 份演示数据”。");
+    if (!hasPreparedDemoSamples()) throw new Error("请先点击“01 载入候选光谱”。");
     promoteDemoSamplesForRun();
     if (!hasAgentAccess()) {
       apiKeyInput.value = "";
       renderApiSettings();
       if (!apiDialog.open) apiDialog.showModal();
-      addMessage("assistant", "<p>演示数据已经准备好。填入自己的模型 Key 后，点击“03 启动筛选任务”即可开始；Key 只用于当前浏览器会话。</p>");
+      addMessage("assistant", "<p>演示数据已经准备好。填入自己的模型 Key 后，点击“03 生成筛选报告”即可开始；Key 只用于当前浏览器会话。</p>");
       return;
     }
     fillRecommendedDemoTask();
