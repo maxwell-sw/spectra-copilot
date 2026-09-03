@@ -685,3 +685,79 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .chat-form { gap: 8px; }
   .chat-form .primary { width: 100%; max-width: none; }
 }
+
+/* Artifact revision is a deliberate versioning action, not a second chat composer. */
+.artifact-download {
+  display: flex;
+  align-items: center;
+  min-height: 39px;
+  margin-top: 13px;
+}
+.artifact-download .secondary, .artifact-download-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: #465d77;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  text-decoration: none;
+}
+.artifact-download .secondary:hover, .artifact-download-link:hover {
+  border-color: #9db6d2;
+  background: #fff;
+  color: var(--spectra-ink);
+}
+.revision-box {
+  margin-top: 18px;
+  padding: 15px;
+  border: 1px solid rgba(189, 207, 226, .76);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(248, 252, 255, .9), rgba(240, 247, 253, .64));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .86);
+}
+.revision-box label {
+  margin: 0;
+  color: var(--spectra-ink);
+  font-size: 13px;
+  font-weight: 720;
+  letter-spacing: -.01em;
+}
+.revision-box > p:not(.muted) {
+  margin: 4px 0 10px;
+  color: #71849b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.revision-box textarea {
+  min-height: 86px;
+  padding: 10px 11px;
+  border-color: #d2dfeb;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .9);
+  color: var(--spectra-ink);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.revision-box textarea::placeholder { color: #94a3b5; }
+.revision-box textarea:focus { border-color: #478ce4; box-shadow: 0 0 0 2px rgba(55, 130, 229, .14); outline: 0; }
+.revision-box .primary {
+  width: auto;
+  min-width: 124px;
+  min-height: 36px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: none;
+  font-size: 12px;
+}
+.revision-box .primary:hover { box-shadow: 0 5px 10px rgba(23, 104, 216, .15); }
+.revision-box .muted {
+  margin: 9px 0 0;
+  color: #8493a5;
+  font-size: 11px;
+  line-height: 1.5;
+}
