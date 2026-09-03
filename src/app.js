@@ -291,6 +291,7 @@ function addMessage(role, html, { remember = true } = {}) {
     } catch { button.textContent = "复制失败"; }
   });
   messages.append(article);
+  bindMessageControls(article);
   article.scrollIntoView({ behavior: "smooth", block: "nearest" });
   if (remember) {
     messageHistory.push({ role, html });
@@ -317,7 +318,7 @@ async function addTypedAssistantMessage(answer, { footer = "" } = {}) {
   }
   const html = `<div class="model-reply">${formatModelReply(safeAnswer)}</div>${footer}`;
   article.querySelector(".message-content").innerHTML = html;
-  bindArtifactPreviewControls(article);
+  bindMessageControls(article);
   messageHistory.push({ role: "assistant", html });
   messageHistory = messageHistory.slice(-80);
   saveSession();
@@ -337,7 +338,7 @@ async function typeIntoRunMessage(article, answer, { footer = "" } = {}) {
   }
   target.parentElement.innerHTML = formatModelReply(safeAnswer);
   content.insertAdjacentHTML("beforeend", footer);
-  bindArtifactPreviewControls(article);
+  bindMessageControls(article);
   messageHistory.push({ role: "assistant", html: content.innerHTML });
   messageHistory = messageHistory.slice(-80);
   saveSession();
@@ -359,6 +360,41 @@ function bindArtifactPreviewControls(article) {
   article.querySelectorAll("[data-open-artifact-id]").forEach((button) => button.addEventListener("click", () => openArtifactInPreview(button.dataset.openArtifactId)));
 }
 
+function weightedRowsFromMarkup(article) {
+  const encoded = article.querySelector(".weighted-export")?.dataset.weightedRows;
+  if (!encoded) return [];
+  try {
+    const rows = JSON.parse(decodeURIComponent(encoded));
+    return Array.isArray(rows) ? rows : [];
+  } catch { return []; }
+}
+
+function weightedRowsFromReport(html) {
+  const document = new DOMParser().parseFromString(String(html ?? ""), "text/html");
+  const table = [...document.querySelectorAll("table")].find((candidate) => /Weighted\s*反射率/.test(candidate.textContent));
+  if (!table) return [];
+  return [...table.querySelectorAll("tbody tr")].map((row) => {
+    const cells = [...row.querySelectorAll("td")].map((cell) => cell.textContent.trim());
+    const band = /([0-9.]+)\s*[–-]\s*([0-9.]+)/.exec(cells[2] ?? "");
+    const value = Number(cells[3]);
+    return band && Number.isFinite(value) ? { file: cells[0], source: cells[1], band: { minMicrons: Number(band[1]), maxMicrons: Number(band[2]) }, value, error: null } : null;
+  }).filter(Boolean);
+}
+
+async function recoverWeightedRowsFromArtifact() {
+  const report = artifactGroups.flatMap((group) => group.versions ?? []).find((artifact) => artifactKind(artifact) === "report" && artifact.url);
+  if (!report) return [];
+  const response = await fetch(report.url);
+  if (!response.ok) return [];
+  return weightedRowsFromReport(await response.text());
+}
+
+function bindMessageControls(article, rows = []) {
+  bindArtifactPreviewControls(article);
+  const storedRows = rows.length ? rows : weightedRowsFromMarkup(article);
+  bindWeightedExportControls(article, storedRows);
+}
+
 async function downloadWeightedExport(rows, format) {
   const response = await request("/api/weighted-export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rows, format }) });
   const blob = await response.blob();
@@ -375,7 +411,12 @@ function bindWeightedExportControls(article, rows = []) {
     const original = button.textContent;
     button.disabled = true;
     button.textContent = "正在导出…";
-    try { await downloadWeightedExport(rows, button.dataset.weightedExport); button.textContent = "已开始下载"; }
+    try {
+      const exportRows = rows.length ? rows : await recoverWeightedRowsFromArtifact();
+      if (!exportRows.length) throw new Error("没有可恢复的加权结果。请重新运行本次计算后再导出。");
+      await downloadWeightedExport(exportRows, button.dataset.weightedExport);
+      button.textContent = "已开始下载";
+    }
     catch (error) { button.textContent = error.message || "导出失败"; }
     setTimeout(() => { button.disabled = false; button.textContent = original; }, 1400);
   }));
@@ -969,9 +1010,9 @@ async function runAgent(task, images = []) {
     timeline.article.querySelector(".run-card").innerHTML = `<div class="run-status success"><i class="run-indicator" aria-hidden="true"></i><div><b>分析已完成</b><small>已生成结果；执行记录可用于追溯工具调用</small></div><time>${formatElapsed(total)}</time></div><details><summary>查看执行记录</summary><ol>${agent.trace.map((item) => `<li><span>${formatElapsed(item.elapsedMs ?? total)}</span><b>${escaped(item.tool)}</b>：${escaped(item.resultSummary)}</li>`).join("")}<li><span>${formatElapsed(total)}</span>完成答复整理</li></ol></details><p class="muted">这里仅记录工具调用与返回结果，不展示模型私密推理。</p>`;
     const artifactItems = (agent.artifacts ?? []).filter((artifact) => artifactKind(artifact) !== "data").map((artifact) => `<button class="secondary inline-preview-button" type="button" data-open-artifact-id="${escaped(artifact.id)}">预览 ${escaped(artifact.filename)}</button>`).join("");
     const artifactActions = artifactItems ? `<div class="artifact-links"><span class="artifact-links-label">本次交付物</span><div>${artifactItems}</div></div>` : "";
-    const weightedActions = Array.isArray(agent.weightedRows) && agent.weightedRows.length ? `<div class="weighted-export"><div><b>加权计算数据</b><span>导出本次可复算的指标结果</span></div><div><button class="secondary" type="button" data-weighted-export="csv">下载 CSV</button><button class="secondary" type="button" data-weighted-export="xlsx">下载 Excel</button></div></div>` : "";
-    const finalArticle = await typeIntoRunMessage(timeline.article, agent.answer, { footer: `${artifactActions}${weightedActions}<p class="muted">模型：${escaped(agent.model)}${agent.usage ? ` · ${agent.usage.totalTokens ?? "未知"} tokens` : ""}</p>` });
-    bindWeightedExportControls(finalArticle, agent.weightedRows);
+    const encodedWeightedRows = encodeURIComponent(JSON.stringify(agent.weightedRows ?? []));
+    const weightedActions = Array.isArray(agent.weightedRows) && agent.weightedRows.length ? `<div class="weighted-export" data-weighted-rows="${escaped(encodedWeightedRows)}"><div><b>加权计算数据</b><span>导出本次可复算的指标结果</span></div><div><button class="secondary" type="button" data-weighted-export="csv">下载 CSV</button><button class="secondary" type="button" data-weighted-export="xlsx">下载 Excel</button></div></div>` : "";
+    await typeIntoRunMessage(timeline.article, agent.answer, { footer: `${artifactActions}${weightedActions}<p class="muted">模型：${escaped(agent.model)}${agent.usage ? ` · ${agent.usage.totalTokens ?? "未知"} tokens` : ""}</p>` });
   } catch (error) {
     clearInterval(timeline.timer);
     const partial = error.partial && typeof error.partial === "object" ? error.partial : null;

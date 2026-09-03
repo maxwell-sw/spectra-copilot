@@ -929,7 +929,8 @@ async function runDeepSeekAgent({ apiKey, provider, endpoint, model, task, image
     { role: "user", content: imageInputs.length ? [{ type: "text", text: JSON.stringify({ ...userPayload, attachedImages: imageInputs.length }) }, ...imageInputs.map((url) => ({ type: "image_url", image_url: { url } }))] : JSON.stringify(userPayload) },
   ];
   let lastUsage = null;
-  for (let round = 0; round < 5; round += 1) {
+  // 预留最后一轮把已完成的工具事实整理成用户可读答复；否则第 5 轮刚生成图/报告时会被误判为超限。
+  for (let round = 0; round < 6; round += 1) {
     onEvent({ type: "decision", round: round + 1, label: round === 0 ? "读取任务、文件摘要与已确认条件" : "检查已返回的工具结果" });
     let response;
     try {

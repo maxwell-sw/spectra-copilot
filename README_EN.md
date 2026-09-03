@@ -115,7 +115,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for intent routing, memory, tool boundari
 1. **Receive data and task** — Search within Desktop in local mode, or upload CSV, TXT, TSV, DPT, or XLSX spectra; a task supports up to 30 files.
 2. **Build trusted context** — Check delimiters, headers, invalid rows, duplicate wavelengths, sorting, Y-value ranges, band coverage, and candidate units. Physical calculations require confirmed units and semantics.
 3. **Use the minimum necessary tools** — Start with summaries; inspect raw rows only when needed; then calculate features, weighted metrics, figures, or reports.
-4. **Enforce the Harness boundary** — Pause for missing bands, temperatures, or confirmations. The current tool loop defaults to five rounds to limit runaway cost.
+4. **Enforce the Harness boundary** — Pause for missing bands, temperatures, or confirmations. The current loop allows up to six model rounds, reserving one to consolidate final evidence while limiting runaway cost.
 5. **Deliver evidence and preserve it** — The chat exposes a public tool trace. Figures, reports, and exports are based on deterministic outputs. Revising `@chart` or `@report` creates only the next version of that artifact.
 
 ## Trust, privacy, and limitations
